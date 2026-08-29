@@ -9,6 +9,7 @@ import type {
   AgentRunner,
   CreateAgentInput,
   Message,
+  Principal,
   UpdateAgentInput,
 } from "./types.js";
 import { WorkspaceManager } from "./workspace.js";
@@ -120,6 +121,26 @@ export class AgentService {
     return this.setStatus(id, "ready");
   }
 
+  /**
+   * Cancels the active Run without stopping the Agent. Used when Warden revokes
+   * authority mid-run: the Agent should return to a controllable state rather
+   * than keep a container alive that can no longer do anything.
+   */
+  async cancelRun(agentId: string, expectedRunId?: string | undefined): Promise<boolean> {
+    if (expectedRunId) {
+      // A stale revocation must not kill a newer run. Only cancel when the
+      // Agent's active run is still the one the grant was issued for.
+      const active = this.store
+        .snapshot()
+        .runs.find(
+          (run) => run.agentId === agentId && (run.status === "running" || run.status === "queued"),
+        );
+      if (!active || active.id !== expectedRunId) return false;
+    }
+    await this.cancelExecution(agentId);
+    return true;
+  }
+
   async stopAgent(id: string): Promise<Agent> {
     this.getAgent(id);
     await this.cancelExecution(id);
@@ -153,6 +174,7 @@ export class AgentService {
   async sendMessage(
     agentId: string,
     prompt: string,
+    actor?: Principal | undefined,
   ): Promise<{ run: AgentRun; message: Message }> {
     if (!isArkConfigured(this.config)) {
       throw new HttpError(
@@ -162,6 +184,9 @@ export class AgentService {
     }
     const timestamp = now();
     const runId = randomUUID();
+    // Assigned BEFORE execution so a Run that fails, or is denied by Warden
+    // before it produces any result, still points at its evidence.
+    const traceId = "trace_" + randomUUID();
     const run: AgentRun = {
       id: runId,
       agentId,
@@ -173,6 +198,8 @@ export class AgentService {
       startedAt: null,
       completedAt: null,
       createdAt: timestamp,
+      actorId: actor?.id ?? "user:local",
+      traceId,
     };
     const message: Message = {
       id: randomUUID(),
@@ -201,7 +228,7 @@ export class AgentService {
       storedAgent.updatedAt = timestamp;
       return snapshot;
     });
-    const execution = this.executeRun(agentAtStart, run);
+    const execution = this.executeRun(agentAtStart, run, actor);
     this.activeExecutions.set(agentId, execution);
     void execution
       .finally(() => {
@@ -232,7 +259,11 @@ export class AgentService {
     };
   }
 
-  private async executeRun(agentAtStart: Agent, run: AgentRun): Promise<void> {
+  private async executeRun(
+    agentAtStart: Agent,
+    run: AgentRun,
+    actor?: Principal | undefined,
+  ): Promise<void> {
     await this.store.mutate((database) => {
       const storedRun = database.runs.find((item) => item.id === run.id);
       if (storedRun) {
@@ -249,6 +280,9 @@ export class AgentService {
         workspacePath: agentAtStart.workspacePath,
         prompt: run.prompt,
         threadId: agentAtStart.codexThreadId,
+        runId: run.id,
+        ...(run.traceId ? { traceId: run.traceId } : {}),
+        ...(actor ? { actor } : {}),
       });
       const completedAt = now();
       await this.store.mutate((database) => {

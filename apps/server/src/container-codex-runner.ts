@@ -8,6 +8,7 @@ import type {
   RunUsage,
   RunnerRequest,
   RunnerResult,
+  RuntimeCredentials,
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -54,8 +55,10 @@ export function buildContainerRunArgs(
     "--label",
     "io.codejam.instance-id=" + config.runtimeInstanceId,
     ...(engineName === "podman" ? ["--userns", "keep-id"] : []),
+    // Warden attaches the Runtime to an INTERNAL network. Without a credentials
+    // block we fall back to the original bridge behaviour.
     "--network",
-    "bridge",
+    request.credentials?.network ?? "bridge",
     "--security-opt",
     "no-new-privileges",
     "--cap-drop",
@@ -68,8 +71,18 @@ export function buildContainerRunArgs(
     String(config.containerPidsLimit),
     "--user",
     config.containerUser,
+    // Passthrough form: values live in the spawn environment, never in argv, so
+    // no credential appears in `ps` output. This does NOT hide them from
+    // `docker inspect`, which resolves and stores the container environment.
+    // Only the REAL provider key is absent from the Runtime; the grant token is
+    // expected to be visible there and is safe to be, being run-scoped,
+    // metered and revocable.
     "--env",
     "ARK_API_KEY",
+    ...Object.keys(request.credentials?.extraEnv ?? {}).flatMap((name) => [
+      "--env",
+      name,
+    ]),
     "--env",
     "CODEX_HOME=/codex-home",
     "--env",
@@ -95,14 +108,15 @@ export class ContainerCodexRunner implements AgentRunner {
 
   async isAvailable(): Promise<boolean> {
     try {
+      const probeEnvironment = this.childEnvironment({ arkApiKey: "" });
       await execFileAsync(this.config.containerEngine, ["version"], {
         timeout: 5_000,
-        env: this.childEnvironment(),
+        env: probeEnvironment,
       });
       await execFileAsync(
         this.config.containerEngine,
         ["image", "inspect", this.config.containerRuntimeImage],
-        { timeout: 5_000, env: this.childEnvironment() },
+        { timeout: 5_000, env: probeEnvironment },
       );
       return true;
     } catch {
@@ -147,7 +161,7 @@ export class ContainerCodexRunner implements AgentRunner {
       buildContainerRunArgs(request, this.config),
       {
         cwd: request.workspacePath,
-        env: this.childEnvironment(),
+        env: this.childEnvironment(request.credentials),
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -235,11 +249,20 @@ export class ContainerCodexRunner implements AgentRunner {
     }
   }
 
-  private childEnvironment(): NodeJS.ProcessEnv {
+  /**
+   * Builds the environment for the container-engine child process.
+   *
+   * When Warden supplies credentials the real Ark key is REPLACED by a
+   * run-scoped grant token, so the raw key never crosses the Runtime boundary.
+   */
+  private childEnvironment(credentials?: RuntimeCredentials | undefined): NodeJS.ProcessEnv {
     const environment: NodeJS.ProcessEnv = {
-      ARK_API_KEY: this.config.arkApiKey,
+      ARK_API_KEY: credentials ? credentials.arkApiKey : this.config.arkApiKey,
       NO_COLOR: "1",
     };
+    for (const [name, value] of Object.entries(credentials?.extraEnv ?? {})) {
+      environment[name] = value;
+    }
     for (const name of [
       "PATH",
       "HOME",

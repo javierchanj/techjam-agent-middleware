@@ -8,6 +8,7 @@ import type {
   RunUsage,
   RunnerRequest,
   RunnerResult,
+  RuntimeCredentials,
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -105,7 +106,7 @@ export class CodexRunner implements AgentRunner {
     try {
       await execFileAsync(this.config.codexBin, ["--version"], {
         timeout: 5_000,
-        env: this.childEnvironment(),
+        env: this.childEnvironment({ arkApiKey: "" }),
       });
       return true;
     } catch {
@@ -132,7 +133,7 @@ export class CodexRunner implements AgentRunner {
     const args = buildCodexArgs(request, this.config.codexSandboxMode);
     const child = spawn(this.config.codexBin, args, {
       cwd: request.workspacePath,
-      env: this.childEnvironment(),
+      env: this.childEnvironment(request.credentials),
       stdio: ["ignore", "pipe", "pipe"],
     });
     const settled = new Promise<void>((resolve) => {
@@ -239,7 +240,7 @@ export class CodexRunner implements AgentRunner {
     }
   }
 
-  private childEnvironment(): NodeJS.ProcessEnv {
+  private childEnvironment(credentials?: RuntimeCredentials | undefined): NodeJS.ProcessEnv {
     const inheritedNames = [
       "PATH",
       "HOME",
@@ -256,11 +257,15 @@ export class CodexRunner implements AgentRunner {
     ] as const;
     const environment: NodeJS.ProcessEnv = {
       CODEX_HOME: this.config.codexHome,
-      ARK_API_KEY: this.config.arkApiKey,
+      // Warden replaces the real key with a run-scoped grant token.
+      ARK_API_KEY: credentials ? credentials.arkApiKey : this.config.arkApiKey,
       NO_COLOR: "1",
     };
     for (const name of inheritedNames) {
       if (process.env[name] !== undefined) environment[name] = process.env[name];
+    }
+    for (const [name, value] of Object.entries(credentials?.extraEnv ?? {})) {
+      environment[name] = value;
     }
     return environment;
   }

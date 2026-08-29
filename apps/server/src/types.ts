@@ -1,3 +1,7 @@
+import type { Principal } from "./warden/types.js";
+
+export type { Principal };
+
 export type AgentStatus = "ready" | "busy" | "stopped" | "error";
 export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 export type MessageRole = "user" | "assistant";
@@ -41,6 +45,10 @@ export interface AgentRun {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  /** Human principal that initiated the run. */
+  actorId?: string | undefined;
+  /** Warden trace correlating every brokered egress decision for this run. */
+  traceId?: string | undefined;
 }
 
 export interface Database {
@@ -68,11 +76,36 @@ export interface RunnerResult {
   usage: RunUsage | null;
 }
 
+/**
+ * Credentials and network placement handed to the Runtime for exactly one run.
+ * Supplied by Warden middleware; absent means "legacy unbrokered execution".
+ */
+export interface RuntimeCredentials {
+  /** Run-scoped capability token injected as ARK_API_KEY. Never the real Ark key. */
+  arkApiKey: string;
+  /**
+   * Container network to attach. Internal (no route off the host), so the
+   * dual-homed Warden broker is the only reachable destination.
+   */
+  network?: string | undefined;
+  extraEnv?: Readonly<Record<string, string>> | undefined;
+}
+
 export interface RunnerRequest {
   agentId: string;
   workspacePath: string;
   prompt: string;
   threadId: string | null;
+  /** Correlates the Runtime execution with the control-plane Run and its trace. */
+  runId?: string | undefined;
+  /**
+   * Assigned when the Run row is created, BEFORE execution, so a Run that fails
+   * or is denied still points at the trace holding its denial evidence.
+   */
+  traceId?: string | undefined;
+  /** The human principal who initiated this run, for action attribution. */
+  actor?: Principal | undefined;
+  credentials?: RuntimeCredentials | undefined;
 }
 
 export interface AgentRunner {

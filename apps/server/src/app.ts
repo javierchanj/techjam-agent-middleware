@@ -7,6 +7,20 @@ import { z } from "zod";
 import type { AppConfig } from "./config.js";
 import { HttpError } from "./errors.js";
 import type { AgentService } from "./agent-service.js";
+import { registerWardenRoutes, type WardenRouteDeps } from "./warden/routes.js";
+import type { Principal } from "./types.js";
+
+/**
+ * Mock human identity. A real deployment swaps this for a session/JWT lookup;
+ * the point is that every Run carries an attributable human principal and that
+ * authorization decisions are made server-side, not in the browser.
+ */
+function actorFromRequest(headerValue: string | string[] | undefined): Principal {
+  const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  const id = (raw ?? "").trim();
+  const safe = /^[A-Za-z0-9:._-]{1,64}$/.test(id) ? id : "user:local";
+  return { kind: "human", id: safe, displayName: safe };
+}
 
 const agentIdParams = z.object({ id: z.string().uuid() });
 const runIdParams = z.object({ id: z.string().uuid() });
@@ -26,6 +40,7 @@ const messageBody = z.object({
 export async function createApp(
   config: AppConfig,
   service: AgentService,
+  warden?: WardenRouteDeps | undefined,
 ): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -119,9 +134,14 @@ export async function createApp(
   app.post("/api/agents/:id/messages", async (request, reply) => {
     const { id } = agentIdParams.parse(request.params);
     const body = messageBody.parse(request.body);
-    const result = await service.sendMessage(id, body.content);
+    const actor = actorFromRequest(request.headers["x-launchpad-actor"]);
+    const result = await service.sendMessage(id, body.content, actor);
     return reply.code(202).send(result);
   });
+
+  if (warden) {
+    await registerWardenRoutes(app, warden);
+  }
 
   app.get("/api/runs/:id", async (request) => {
     const { id } = runIdParams.parse(request.params);

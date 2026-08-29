@@ -44,6 +44,27 @@ const envSchema = z.object({
     .string()
     .url()
     .default("https://ark.cn-beijing.volces.com/api/v3"),
+  /**
+   * "auto" (default) enables Warden exactly when the container Runtime is in
+   * use, which is the only provider where its isolation invariant can hold.
+   * An explicit "true" on any other provider is a configuration error.
+   */
+  WARDEN_ENABLED: z.enum(["true", "false", "auto"]).default("auto"),
+  WARDEN_PORT: z.coerce.number().int().min(1).max(65535).default(8788),
+  WARDEN_CONTROL_PORT: z.coerce.number().int().min(1).max(65535).default(8789),
+  WARDEN_BROKER_HOST: z.string().min(1).default("warden-broker"),
+  WARDEN_INTERNAL_NETWORK: z.string().min(1).default("launchpad-warden-internal"),
+  WARDEN_EGRESS_NETWORK: z.string().min(1).default("launchpad-warden-egress"),
+  /** Provider surface the Runtime may reach. Exact `METHOD /path` entries. */
+  WARDEN_MODEL_PATHS: z
+    .string()
+    .default("POST /responses,POST /chat/completions,GET /models,GET /models/{id}"),
+  WARDEN_GRANT_TTL_MS: z.coerce.number().int().min(1_000).default(900_000),
+  WARDEN_MAX_MODEL_CALLS: z.coerce.number().int().positive().default(40),
+  WARDEN_MAX_TOTAL_TOKENS: z.coerce.number().int().positive().default(120_000),
+  WARDEN_MAX_WALL_CLOCK_MS: z.coerce.number().int().min(1_000).default(600_000),
+  /** Comma-separated extra hosts the Agent may reach on the network plane. Empty = deny all. */
+  WARDEN_ALLOWED_NETWORK_HOSTS: z.string().default(""),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
@@ -59,6 +80,16 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env) {
         "APP_AUTH_TOKEN must contain at least 24 characters for a non-loopback production server",
       );
     }
+  }
+  const wardenEnabled =
+    env.WARDEN_ENABLED === "true" ||
+    (env.WARDEN_ENABLED === "auto" && env.RUNTIME_PROVIDER === "container");
+  if (wardenEnabled && env.RUNTIME_PROVIDER !== "container") {
+    throw new Error(
+      "WARDEN_ENABLED=true requires RUNTIME_PROVIDER=container. The local-process " +
+        "Runtime shares the host network, so Runtime egress cannot be contained. " +
+        "Set WARDEN_ENABLED=false to run the unbrokered baseline.",
+    );
   }
   const defaultContainerUser =
     typeof process.getuid === "function" && typeof process.getgid === "function"
@@ -88,7 +119,41 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env) {
     arkModel: env.ARK_MODEL?.trim() ?? "",
     arkBaseUrl: env.ARK_BASE_URL.replace(/\/+$/, ""),
     nodeEnv: env.NODE_ENV,
+    warden: {
+      enabled: wardenEnabled,
+      port: env.WARDEN_PORT,
+      controlPort: env.WARDEN_CONTROL_PORT,
+      brokerHost: env.WARDEN_BROKER_HOST,
+      // Namespaced per instance so two Launchpad installations on one host do
+      // not share (or tear down) each other's networks.
+      internalNetwork: env.WARDEN_INTERNAL_NETWORK + "-" + env.RUNTIME_INSTANCE_ID,
+      egressNetwork: env.WARDEN_EGRESS_NETWORK + "-" + env.RUNTIME_INSTANCE_ID,
+      modelPaths: env.WARDEN_MODEL_PATHS.split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+      grantTtlMs: env.WARDEN_GRANT_TTL_MS,
+      maxModelCalls: env.WARDEN_MAX_MODEL_CALLS,
+      maxTotalTokens: env.WARDEN_MAX_TOTAL_TOKENS,
+      maxWallClockMs: env.WARDEN_MAX_WALL_CLOCK_MS,
+      allowedNetworkHosts: env.WARDEN_ALLOWED_NETWORK_HOSTS.split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+    },
   };
+}
+
+/**
+ * Base URL Codex is told to use.
+ *
+ * Proxy environment variables cannot carry out credential substitution: an
+ * HTTPS request through a forward proxy is an opaque CONNECT tunnel, so the
+ * broker could never rewrite its Authorization header. The model request must
+ * therefore address the broker DIRECTLY over plaintext HTTP inside the internal
+ * network, which is why the base URL is overridden rather than proxied.
+ */
+export function modelPlaneBaseUrl(config: AppConfig): string {
+  if (!config.warden.enabled) return config.arkBaseUrl;
+  return "http://" + config.warden.brokerHost + ":" + config.warden.port + "/v1";
 }
 
 export function isArkConfigured(config: AppConfig): boolean {
@@ -109,7 +174,7 @@ export async function writeCodexConfig(config: AppConfig): Promise<void> {
     "",
     "[model_providers.volcengine_ark]",
     'name = "Volcengine Ark"',
-    "base_url = " + JSON.stringify(config.arkBaseUrl),
+    "base_url = " + JSON.stringify(modelPlaneBaseUrl(config)),
     'env_key = "ARK_API_KEY"',
     'wire_api = "responses"',
     "requires_openai_auth = false",
