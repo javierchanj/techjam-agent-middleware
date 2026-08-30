@@ -110,6 +110,8 @@ export const api = {
   wardenCheck: (host: string) =>
     request<PolicyCheckResult>("/api/warden/policy/check", {
       method: "POST",
-      body: JSON.stringify({ plane: "network", host, port: 443, method: "CONNECT" }),
+      // "any" asks whether the destination is reachable at all, rather than
+      // reporting the model host as denied because it is not a network scope.
+      body: JSON.stringify({ plane: "any", host, port: 443, method: "CONNECT" }),
     }),
 };

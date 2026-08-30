@@ -28,6 +28,7 @@ export interface PolicyCheckResult {
   code: string | null;
   message: string;
   matchedHost: string | null;
+  matchedPlane: EgressPlane | null;
 }
 
 export interface WardenStatus {

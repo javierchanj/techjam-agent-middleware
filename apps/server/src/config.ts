@@ -61,7 +61,7 @@ const envSchema = z.object({
     .default("POST /responses,POST /chat/completions,GET /models,GET /models/{id}"),
   WARDEN_GRANT_TTL_MS: z.coerce.number().int().min(1_000).default(900_000),
   WARDEN_MAX_MODEL_CALLS: z.coerce.number().int().positive().default(40),
-  WARDEN_MAX_TOTAL_TOKENS: z.coerce.number().int().positive().default(120_000),
+  WARDEN_MAX_TOTAL_TOKENS: z.coerce.number().int().positive().default(2_500_000),
   WARDEN_MAX_WALL_CLOCK_MS: z.coerce.number().int().min(1_000).default(600_000),
   /** Comma-separated extra hosts the Agent may reach on the network plane. Empty = deny all. */
   WARDEN_ALLOWED_NETWORK_HOSTS: z.string().default(""),

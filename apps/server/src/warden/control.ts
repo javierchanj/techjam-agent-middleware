@@ -57,7 +57,7 @@ export interface PolicySnapshot {
 }
 
 export interface PolicyCheckInput {
-  plane: EgressPlane;
+  plane: EgressPlane | "any";
   host: string;
   port: number;
   method: string;
@@ -72,6 +72,8 @@ export interface PolicyCheckResult {
   code: string | null;
   message: string;
   matchedHost: string | null;
+  /** Which plane answered. Null when nothing permitted the destination. */
+  matchedPlane: EgressPlane | null;
 }
 
 export interface TemplateDescriptor {
@@ -296,23 +298,42 @@ export class InProcessWardenControl implements WardenControl {
       expiresAt: new Date(now + 60_000).toISOString(),
       closedAt: null,
     };
-    const decision = evaluate(synthetic, {
-      plane: input.plane,
-      host: input.host,
-      port: input.port,
-      method: input.method,
-      path: input.plane === "model" ? "/v1/responses" : "",
-      nowMs: now,
-    });
-    if (decision.effect === "allow") {
-      return {
-        allowed: true,
-        code: null,
-        message: "Allowed by scope " + decision.matchedScope.host,
-        matchedHost: decision.matchedScope.host,
-      };
+    const planes: EgressPlane[] =
+      input.plane === "any" ? ["model", "network"] : [input.plane];
+
+    let lastDenial: { code: string; message: string } | null = null;
+    for (const plane of planes) {
+      const decision = evaluate(synthetic, {
+        plane,
+        host: input.host,
+        port: input.port,
+        method: plane === "model" ? "POST" : input.method,
+        path: plane === "model" ? "/v1/responses" : "",
+        nowMs: now,
+      });
+      if (decision.effect === "allow") {
+        return {
+          allowed: true,
+          code: null,
+          message:
+            "Allowed on the " + plane + " plane by scope " + decision.matchedScope.host,
+          matchedHost: decision.matchedScope.host,
+          matchedPlane: plane,
+        };
+      }
+      // Prefer the most specific denial. "no capability on this plane at all" is
+      // less informative than "this host is not on the list".
+      if (!lastDenial || decision.code !== "plane_not_allowed") {
+        lastDenial = { code: decision.code, message: decision.message };
+      }
     }
-    return { allowed: false, code: decision.code, message: decision.message, matchedHost: null };
+    return {
+      allowed: false,
+      code: lastDenial?.code ?? "host_not_allowed",
+      message: lastDenial?.message ?? "Destination is not permitted.",
+      matchedHost: null,
+      matchedPlane: null,
+    };
   }
 
   async status(): Promise<WardenControlStatus> {

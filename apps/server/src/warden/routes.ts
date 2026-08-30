@@ -9,8 +9,7 @@ const revokeBody = z.object({ reason: z.string().trim().min(1).max(200) });
 const traceQuery = z.object({ agentId: z.string().uuid().optional() });
 const templateBody = z.object({ id: z.string().trim().min(1).max(64) });
 const checkBody = z.object({
-  plane: z.enum(["model", "network"]).default("network"),
-  host: z.string().trim().min(1).max(253),
+  plane: z.enum(["model", "network", "any"]).default("any"),  host: z.string().trim().min(1).max(253),
   port: z.coerce.number().int().min(1).max(65535).default(443),
   method: z.string().trim().min(1).max(16).default("CONNECT"),
 });

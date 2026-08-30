@@ -111,3 +111,44 @@ describe("dry-run policy check", () => {
     expect(result.allowed).toBe(false);
   });
 });
+
+
+describe('dry-run plane "any"', () => {
+  it("reports the model host as ALLOWED, matching what the panel lists", async () => {
+    // Checking only the network plane reported the model host as denied while
+    // the panel listed it as reachable, which reads as a contradiction.
+    const c = control();
+    const result = await c.checkPolicy({
+      plane: "any",
+      host: "ark.test",
+      port: 443,
+      method: "CONNECT",
+    });
+    expect(result).toMatchObject({ allowed: true, matchedPlane: "model" });
+  });
+
+  it("still denies a host on neither plane, with the specific reason", async () => {
+    const result = await control().checkPolicy({
+      plane: "any",
+      host: "attacker.example.net",
+      port: 443,
+      method: "CONNECT",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.matchedPlane).toBeNull();
+    // Not the vaguer "plane_not_allowed".
+    expect(result.code).toBe("host_not_allowed");
+  });
+
+  it("finds a network host once a template grants one", async () => {
+    const c = control();
+    await c.applyTemplate("model-plus-github");
+    const result = await c.checkPolicy({
+      plane: "any",
+      host: "api.github.com",
+      port: 443,
+      method: "CONNECT",
+    });
+    expect(result).toMatchObject({ allowed: true, matchedPlane: "network" });
+  });
+});
