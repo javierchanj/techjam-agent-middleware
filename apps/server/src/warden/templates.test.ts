@@ -181,3 +181,78 @@ describe("dry run agrees with the panel on a non-default model port", () => {
     expect(result).toMatchObject({ allowed: true, matchedPlane: "model" });
   });
 });
+
+describe("granting a capability the Agent actually asked for", () => {
+  it("model-plus-dev-tools permits the npm registry that model-only refused", async () => {
+    // A real run showed the Agent attempting `npm install` five times and being
+    // refused. That is correct under model-only, but an operator must be able
+    // to GRANT the capability rather than only observe it being denied.
+    const c = control();
+    const before = await c.checkPolicy({
+      plane: "any", host: "registry.npmjs.org", port: 443, method: "CONNECT",
+    });
+    expect(before.allowed).toBe(false);
+
+    await c.applyTemplate("model-plus-dev-tools");
+    const after = await c.checkPolicy({
+      plane: "any", host: "registry.npmjs.org", port: 443, method: "CONNECT",
+    });
+    expect(after).toMatchObject({ allowed: true, matchedPlane: "network" });
+  });
+
+  it("still refuses everything outside the granted set", async () => {
+    const c = control();
+    await c.applyTemplate("model-plus-dev-tools");
+    for (const host of ["ab.chatgpt.com", "attacker.example.net", "registry.npmjs.org.evil.net"]) {
+      const result = await c.checkPolicy({ plane: "any", host, port: 443, method: "CONNECT" });
+      expect(result.allowed).toBe(false);
+    }
+  });
+
+  it("does not silently widen the model plane", async () => {
+    const c = control();
+    await c.applyTemplate("model-plus-dev-tools");
+    const scopes = (await c.getPolicy()).scopes.filter((scope) => scope.plane === "model");
+    expect(scopes).toHaveLength(1);
+  });
+});
+
+describe("policy administration is audited", () => {
+  it("records who widened the policy, and from what", async () => {
+    // Applying a template is the one action that can loosen the whole system.
+    // Leaving it unattributed would make it the only decision Warden does not
+    // record.
+    const c = control();
+    await c.applyTemplate("model-only", "user:alice");
+    await c.applyTemplate("model-plus-dev-tools", "user:bob");
+
+    const changes = await c.listPolicyChanges();
+    expect(changes).toHaveLength(2);
+    // Newest first.
+    expect(changes[0]).toMatchObject({
+      actorId: "user:bob",
+      fromTemplate: "model-only",
+      toTemplate: "model-plus-dev-tools",
+    });
+    expect(changes[0]?.scopeSummary).toContain("network:registry.npmjs.org");
+    expect(changes[1]).toMatchObject({ actorId: "user:alice", fromTemplate: null });
+  });
+
+  it("defaults to the local operator when no actor is supplied", async () => {
+    const c = control();
+    await c.applyTemplate("model-only");
+    expect((await c.listPolicyChanges())[0]?.actorId).toBe("user:local");
+  });
+
+  it("records the fully offline profile as granting no egress", async () => {
+    const c = control();
+    await c.applyTemplate("no-external-network", "user:alice");
+    expect((await c.listPolicyChanges())[0]?.scopeSummary).toBe("no egress");
+  });
+
+  it("does not record a change when the template is unknown", async () => {
+    const c = control();
+    await expect(c.applyTemplate("root-access", "user:mallory")).rejects.toThrow();
+    expect(await c.listPolicyChanges()).toHaveLength(0);
+  });
+});

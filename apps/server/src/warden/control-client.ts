@@ -2,6 +2,7 @@ import type {
   BeginRunInput,
   BeginRunResult,
   EndRunInput,
+  PolicyChangeRecord,
   PolicyCheckInput,
   PolicyCheckResult,
   PolicySnapshot,
@@ -108,11 +109,15 @@ export class RemoteWardenControl implements WardenControl {
     return this.call<TemplateDescriptor[]>("/control/templates");
   }
 
-  applyTemplate(id: string): Promise<PolicySnapshot> {
+  applyTemplate(id: string, actorId?: string | undefined): Promise<PolicySnapshot> {
     return this.call<PolicySnapshot>("/control/policy/template", {
       method: "POST",
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, actorId }),
     });
+  }
+
+  listPolicyChanges(): Promise<PolicyChangeRecord[]> {
+    return this.call<PolicyChangeRecord[]>("/control/policy/history");
   }
 
   checkPolicy(input: PolicyCheckInput): Promise<PolicyCheckResult> {

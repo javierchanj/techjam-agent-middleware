@@ -61,31 +61,31 @@ export function isRestrictedAddress(host: string): boolean {
   if (/^::ffff:/i.test(value)) {
     return BLOCKED_V4.some((pattern) => pattern.test(value.replace(/^::ffff:/i, "")));
   }
-  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(value)) return false;
+  if (/^ff[0-9a-f]{2}:/i.test(value)) return true;     // multicast v6
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
+  if (!ipv4) return false;
+  const octets = ipv4.slice(1).map(Number);
+  // A malformed literal is refused rather than parsed leniently.
+  if (octets.some((octet) => octet > 255)) return true;
+  const first = octets[0] ?? 0;
+  if (first >= 224) return true;                       // multicast + reserved
   return BLOCKED_V4.some((pattern) => pattern.test(value));
 }
 
 /**
- * The broker is dual-homed: it sits on the internal Runtime network AND an
- * egress network. Without this guard an Agent could ask it to open a tunnel to
- * a sibling container or a link-local metadata endpoint. Literal addresses in
- * these ranges are refused outright; an allowlisted hostname that happens to
- * resolve into one is still permitted, because the operator named it.
+ * Single canonical classifier, used BOTH for literal addresses at policy time
+ * and for DNS results at connect time.
+ *
+ * There were previously two implementations with different coverage: the
+ * policy-time one knew about CGNAT (100.64.0.0/10) and IPv4-mapped IPv6, the
+ * connect-time one did not. An allowlisted hostname resolving into 100.64/10
+ * therefore passed the resolver screen even though the same literal would have
+ * been refused earlier. Two classifiers means two answers to one question.
  */
 export function isBlockedLiteralAddress(host: string): boolean {
   const value = normalizeHost(host);
   if (value === "localhost") return true;
-  if (/^::1$|^fe80:|^fc[0-9a-f]{2}:|^fd[0-9a-f]{2}:/i.test(value)) return true;
-  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
-  if (!ipv4) return false;
-  const octets = ipv4.slice(1).map(Number);
-  const [a = 0, b = 0] = octets;
-  if (octets.some((octet) => octet > 255)) return true;
-  if (a === 127 || a === 0 || a === 10) return true;
-  if (a === 169 && b === 254) return true; // link-local / cloud metadata
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  return false;
+  return isRestrictedAddress(value);
 }
 
 export function scopeMatches(scope: EgressScope, request: PolicyRequest): boolean {

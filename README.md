@@ -1,10 +1,47 @@
 # Volc Agent Launchpad
 
-> **Warden middleware.** This fork replaces the Runtime's ambient provider
-> credential and open internet access with a run-scoped, brokered, revocable
-> capability. See [docs/WARDEN.md](docs/WARDEN.md) for the architecture, threat
-> model, honest limitations and demo script. Set `WARDEN_ENABLED=false` to run
-> the unmodified baseline.
+## Warden — the submission
+
+This fork adds **Warden**, middleware that replaces the Runtime's ambient
+provider credential and open internet access with a run-scoped, brokered,
+metered and revocable capability.
+
+**Judging path — this is the one that runs Warden:**
+
+```bash
+ARK_API_KEY=<ark model api key> \
+ARK_MODEL=ep-<endpoint id> \
+ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3 \
+npm run poc
+```
+
+`ARK_BASE_URL` matters: the starter default points at Volcengine
+(`ark.cn-beijing.volces.com`). A **BytePlus** key sent there returns
+"The API key doesn't exist". Use the line above for BytePlus accounts.
+
+| Startup path | Warden | Use |
+| --- | --- | --- |
+| `npm run poc` | **Enabled** | **Official judging and demo path** |
+| `npm run dev` | Disabled | Baseline development only |
+| `docker compose up` | Disabled | Baseline deployment only |
+| ECS | Disabled | Not supported by this Warden POC |
+
+Warden requires `RUNTIME_PROVIDER=container`; the other paths use the
+local-process Runtime, which shares the host network and cannot satisfy its
+isolation invariant. `WARDEN_ENABLED=auto` (the default) enables it exactly
+where it can hold.
+
+Verify it:
+
+```bash
+npm run check                                            # unit tests + build
+node scripts/warden-smoke.mjs                            # broker, no Docker needed
+WARDEN_DOCKER_TESTS=1 npm run test -w @launchpad/server   # real two-network topology
+```
+
+Architecture, threat model, honest limitations and the three-minute demo script
+are in **[docs/WARDEN.md](docs/WARDEN.md)**. The sections below describe the
+unmodified starter kit.
 
 
 A minimal Agent platform for three-day middleware hackathons. It provides Agent

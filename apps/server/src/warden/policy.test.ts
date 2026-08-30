@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluate,
   isBlockedLiteralAddress,
+  isRestrictedAddress,
   matchHost,
   normalizeHost,
   WardenPolicyStore,
@@ -239,5 +240,41 @@ describe("budget denials are actionable", () => {
   it("keeps the wall-clock denial distinct from the token denial", () => {
     const decision = evaluate(grantFixture(), request({ nowMs: T0 + 60_001 }));
     expect(decision).toMatchObject({ effect: "deny", code: "budget_time_exhausted" });
+  });
+});
+
+describe("one canonical address classifier", () => {
+  // Two implementations previously disagreed: the policy-time one knew about
+  // CGNAT and IPv4-mapped IPv6, the DNS-screening one did not, so an
+  // allowlisted host resolving into 100.64/10 slipped past the resolver.
+  const mustBlock = [
+    "127.0.0.1", "0.0.0.0", "10.1.2.3", "192.168.1.1", "172.20.0.9",
+    "169.254.169.254", "100.64.0.1", "100.127.255.254",
+    "::1", "::", "fd00::1", "fe80::1", "ff02::1",
+    "::ffff:169.254.169.254", "::ffff:10.0.0.1",
+    "224.0.0.1", "255.255.255.255", "999.1.1.1",
+  ];
+  const mustAllow = ["93.184.216.34", "8.8.8.8", "100.63.255.255", "100.128.0.1", "172.15.0.1", "172.32.0.1"];
+
+  it("blocks every private, loopback, link-local, CGNAT and multicast form", () => {
+    for (const host of mustBlock) {
+      expect(isRestrictedAddress(host), host).toBe(true);
+      expect(isBlockedLiteralAddress(host), host).toBe(true);
+    }
+  });
+
+  it("leaves genuinely public addresses reachable", () => {
+    for (const host of mustAllow) {
+      expect(isRestrictedAddress(host), host).toBe(false);
+      expect(isBlockedLiteralAddress(host), host).toBe(false);
+    }
+  });
+
+  it("agrees with itself on every case, so policy and DNS screening cannot diverge", () => {
+    for (const host of [...mustBlock, ...mustAllow]) {
+      // localhost is the only intentional difference: a name, not a literal.
+      expect(isBlockedLiteralAddress(host), host).toBe(isRestrictedAddress(host));
+    }
+    expect(isBlockedLiteralAddress("localhost")).toBe(true);
   });
 });

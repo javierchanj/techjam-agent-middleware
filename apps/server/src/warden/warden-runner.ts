@@ -84,6 +84,10 @@ export class WardenRunner implements AgentRunner {
       workspacePath: request.workspacePath,
     });
 
+    // The broker registers the token in ITS redactor; this process needs its own
+    // registration to scrub run output on the way back out.
+    redactor.register(begun.token, "warden_grant_token");
+
     const proxyUrl =
       "http://grant:" +
       encodeURIComponent(begun.token) +
@@ -127,6 +131,15 @@ export class WardenRunner implements AgentRunner {
           },
         },
       });
+      // The Agent can read its own environment. `echo $ARK_API_KEY` would put
+      // the grant token straight into the run output, which AgentService then
+      // persists as a message and the browser renders. The token is closed by
+      // the time this returns, but "raw grant tokens never appear in UI or demo
+      // output" has to be true of the happy path too, not just error paths.
+      const safeResult: RunnerResult = {
+        ...result,
+        output: redactor.redactString(result.output),
+      };
       await control.endRun({
         traceId,
         grantId: begun.grant.id,
@@ -134,7 +147,7 @@ export class WardenRunner implements AgentRunner {
         status: "ok",
       });
       await this.archive(traceId);
-      return result;
+      return safeResult;
     } catch (error) {
       const message = redactedMessage(redactor, error);
       const finalGrant = await control.getGrant(begun.grant.id).catch(() => null);
@@ -152,6 +165,7 @@ export class WardenRunner implements AgentRunner {
       throw error instanceof Error ? Object.assign(error, { message }) : new Error(message);
     } finally {
       clearTimeout(deadline);
+      redactor.unregister(begun.token);
     }
   }
 }

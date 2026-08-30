@@ -82,6 +82,20 @@ export interface PolicyCheckResult {
   matchedPlane: EgressPlane | null;
 }
 
+/**
+ * Applying a template widens or narrows what every subsequent run is delegated.
+ * That is an administrative act on the enforcement policy, so it is attributed
+ * and retained like any other decision Warden makes -- otherwise the one action
+ * that can loosen the whole system is the only one with no record.
+ */
+export interface PolicyChangeRecord {
+  at: string;
+  actorId: string;
+  fromTemplate: string | null;
+  toTemplate: string;
+  scopeSummary: string;
+}
+
 export interface TemplateDescriptor {
   id: string;
   label: string;
@@ -109,7 +123,8 @@ export interface WardenControl {
   getTrace(traceId: string): Promise<WardenTrace | null>;
   getPolicy(): Promise<PolicySnapshot>;
   listTemplates(): Promise<TemplateDescriptor[]>;
-  applyTemplate(id: string): Promise<PolicySnapshot>;
+  applyTemplate(id: string, actorId?: string | undefined): Promise<PolicySnapshot>;
+  listPolicyChanges(): Promise<PolicyChangeRecord[]>;
   checkPolicy(input: PolicyCheckInput): Promise<PolicyCheckResult>;
   status(): Promise<WardenControlStatus>;
 }
@@ -134,6 +149,7 @@ export interface InProcessControlOptions {
  */
 export class InProcessWardenControl implements WardenControl {
   private templateId: string | null = null;
+  private readonly policyChanges: PolicyChangeRecord[] = [];
 
   constructor(private readonly options: InProcessControlOptions) {}
 
@@ -261,17 +277,36 @@ export class InProcessWardenControl implements WardenControl {
     return { ...this.options.policy.snapshot(), templateId: this.templateId };
   }
 
+  async listPolicyChanges(): Promise<PolicyChangeRecord[]> {
+    return [...this.policyChanges].reverse();
+  }
+
   async listTemplates(): Promise<TemplateDescriptor[]> {
     return describeTemplates(this.options.upstreamHost ?? "", this.options.upstreamPort ?? 443);
   }
 
-  async applyTemplate(id: string): Promise<PolicySnapshot> {
+  async applyTemplate(id: string, actorId?: string | undefined): Promise<PolicySnapshot> {
     const template = findTemplate(id);
     if (!template) throw new Error("Unknown grant template: " + id);
-    this.options.policy.setScopes(
-      template.build(this.options.upstreamHost ?? "", this.options.upstreamPort ?? 443),
+    const previous = this.templateId;
+    const scopes = template.build(
+      this.options.upstreamHost ?? "",
+      this.options.upstreamPort ?? 443,
     );
+    this.options.policy.setScopes(scopes);
     this.templateId = id;
+    this.policyChanges.push({
+      at: new Date().toISOString(),
+      actorId: actorId ?? "user:local",
+      fromTemplate: previous,
+      toTemplate: id,
+      scopeSummary:
+        scopes.length === 0
+          ? "no egress"
+          : scopes.map((scope) => scope.plane + ":" + scope.host).join(", "),
+    });
+    // Bounded: this is an audit tail, not an archive.
+    if (this.policyChanges.length > 100) this.policyChanges.shift();
     // Existing grants keep the scopes they were minted with. Templates change
     // what the NEXT run is delegated, which keeps a run's authority stable
     // for its whole lifetime.

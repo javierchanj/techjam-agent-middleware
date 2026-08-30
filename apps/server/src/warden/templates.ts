@@ -60,6 +60,24 @@ export const GRANT_TEMPLATES: readonly GrantTemplate[] = [
     ],
   },
   {
+    id: "model-plus-dev-tools",
+    label: "Node development",
+    description:
+      "Inference plus the npm registry and GitHub, for Node.js Agents that install dependencies or work with repositories.",
+    guarantees: [
+      "Outbound network limited to the npm registry and GitHub hosts on port 443",
+      "Connections are pinned to the screened resolved address",
+      "Request contents are NOT inspected: TLS is opaque to the broker, so an allowed host can receive anything",
+    ],
+    build: (host, port) => [
+      modelScope(host, port),
+      { plane: "network", host: "registry.npmjs.org", ports: [443], description: "npm registry" },
+      { plane: "network", host: "github.com", ports: [443], description: "GitHub" },
+      { plane: "network", host: "api.github.com", ports: [443], description: "GitHub API" },
+      { plane: "network", host: "codeload.github.com", ports: [443], description: "GitHub archives" },
+    ],
+  },
+  {
     id: "no-external-network",
     label: "Fully offline",
     description:

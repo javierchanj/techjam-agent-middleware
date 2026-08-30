@@ -250,11 +250,11 @@ export default function WardenPanel({ agentId }: { agentId: string | null }) {
         </div>
         {probe && (
           <p className={probe.allowed ? "warden-probe-allow" : "warden-deny"}>
-          <strong>
-            {probe.allowed ? "allowed · " + (probe.matchedPlane ?? "") : (probe.code ?? "denied")}
-          </strong>{" "}
-          {probe.message}
-        </p>
+            <strong>
+              {probe.allowed ? "allowed · " + (probe.matchedPlane ?? "") : (probe.code ?? "denied")}
+            </strong>{" "}
+            {probe.message}
+          </p>
         )}
         <p className="warden-span-meta">
           Dry run against the live policy. Nothing is minted and no connection is made.

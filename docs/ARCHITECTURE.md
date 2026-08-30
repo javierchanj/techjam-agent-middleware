@@ -1,6 +1,32 @@
 # Architecture
 
+> **This document describes the starter-kit baseline.** With Warden enabled —
+> which is the default under `npm run poc` — the Runtime no longer holds the
+> provider credential and no longer has direct egress. See
+> [WARDEN.md](WARDEN.md) for the brokered architecture, and the diagram below
+> for how the two relate.
+
 Volc Agent Launchpad is a single-node control plane for hackathon use.
+
+## Baseline vs Warden-enabled
+
+```mermaid
+flowchart LR
+    subgraph baseline["Baseline (WARDEN_ENABLED=false)"]
+        C1["Runtime container<br/>holds real ARK_API_KEY<br/>--network bridge"] --> A1["Ark / ModelArk"]
+        C1 -.->|"unrestricted"| Net1["anywhere on the internet"]
+    end
+    subgraph warden["Warden enabled (npm run poc)"]
+        C2["Runtime container<br/>holds wgt_ grant only<br/>--network internal"] --> B["Warden broker<br/>policy · metering · trace"]
+        B --> A2["Ark / ModelArk<br/>(real key injected here)"]
+        B -.->|"allowlisted only"| Net2["named destinations"]
+    end
+```
+
+The control plane, `AgentService`, workspaces and the JSON store are identical
+in both. Warden is a decorator around `AgentRunner`, so nothing below changes
+shape — only what the Runtime is permitted to reach.
+
 
 ```mermaid
 flowchart LR

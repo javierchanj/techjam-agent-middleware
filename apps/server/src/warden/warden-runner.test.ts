@@ -190,3 +190,47 @@ describe("WardenRunner", () => {
     vi.useRealTimers();
   });
 });
+
+describe("run output cannot leak the grant token", () => {
+  const leakingRunner = (): AgentRunner => ({
+    // Simulates `echo $ARK_API_KEY` -- the Agent can read its own environment.
+    run: async (input) => ({
+      output:
+        "Here is what I found:\nARK_API_KEY=" +
+        (input.credentials?.arkApiKey ?? "") +
+        "\nproxy=" +
+        (input.credentials?.extraEnv?.HTTPS_PROXY ?? ""),
+      threadId: null,
+      usage: null,
+    }),
+    cancel: async () => true,
+    isAvailable: async () => true,
+  });
+
+  it("redacts the token from a SUCCESSFUL run's output", async () => {
+    const { runner, vault } = harness(leakingRunner());
+    const result = await runner.run(request);
+    const token = vault.list()[0];
+    expect(result.output).not.toMatch(/wgt_[A-Za-z0-9_-]{20,}/);
+    expect(result.output).toContain("[redacted:warden_grant_token]");
+    expect(token).toBeDefined();
+  });
+
+  it("redacts the proxy URL, which embeds the token as userinfo", async () => {
+    const { runner } = harness(leakingRunner());
+    const result = await runner.run(request);
+    // http://grant:<token>@warden-broker:8788 would otherwise carry it through.
+    expect(result.output).not.toMatch(/grant:wgt_/);
+  });
+
+  it("leaves ordinary output untouched", async () => {
+    const inner: AgentRunner = {
+      run: async () => ({ output: "Created src/cli.ts and added a test.", threadId: null, usage: null }),
+      cancel: async () => true,
+      isAvailable: async () => true,
+    };
+    const { runner } = harness(inner);
+    const result = await runner.run(request);
+    expect(result.output).toBe("Created src/cli.ts and added a test.");
+  });
+});

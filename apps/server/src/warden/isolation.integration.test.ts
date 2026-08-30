@@ -191,18 +191,6 @@ describe.skipIf(!enabled)("Warden live topology", () => {
     expect(output).not.toContain("REACHED");
   });
 
-  it("8b. the gateway IS reachable, so test 8 proves isolation and not breakage", async () => {
-    // Same host, different port. If this also failed, test 8 would be passing
-    // for the wrong reason -- the broker being unreachable altogether.
-    const output = await inRuntime(
-      `const net=require("node:net");const s=net.connect({host:"${ALIAS}",port:${GATEWAY_PORT},timeout:5000});` +
-        `s.on("connect",()=>{console.log("REACHED");s.destroy()});` +
-        `s.on("timeout",()=>{console.log("BLOCKED");s.destroy()});` +
-        `s.on("error",e=>console.log("BLOCKED "+e.code));`,
-    );
-    expect(output).toContain("REACHED");
-  });
-
   it("5. a forged grant is refused", async () => {
     const output = await inRuntime(
       `const r = await fetch("http://${ALIAS}:${GATEWAY_PORT}/v1/responses",` +
@@ -239,7 +227,10 @@ describe.skipIf(!enabled)("Warden live topology", () => {
   });
 
   it("8. the control API is unreachable from the Runtime", async () => {
-    // Against the broker's own alias, not the Runtime's loopback.
+    // Against the broker's own alias on the internal network, not the
+    // Runtime's loopback. The broker binds control to its EGRESS interface
+    // only, so this must not even complete a TCP handshake -- a request-layer
+    // guard would still let the connection open, which is a weaker property.
     const output = await inRuntime(
       `const net=require("node:net");const s=net.connect({host:"${ALIAS}",port:${CONTROL_PORT},timeout:5000});` +
         `s.on("connect",()=>{console.log("REACHED");s.destroy()});` +
@@ -248,6 +239,18 @@ describe.skipIf(!enabled)("Warden live topology", () => {
     );
     expect(output).toContain("BLOCKED");
     expect(output).not.toContain("REACHED");
+  });
+
+  it("8b. the gateway IS reachable, so test 8 proves isolation and not breakage", async () => {
+    // Same host, different port. If this also failed, test 8 would be passing
+    // for the wrong reason -- the broker being unreachable altogether.
+    const output = await inRuntime(
+      `const net=require("node:net");const s=net.connect({host:"${ALIAS}",port:${GATEWAY_PORT},timeout:5000});` +
+        `s.on("connect",()=>{console.log("REACHED");s.destroy()});` +
+        `s.on("timeout",()=>{console.log("BLOCKED");s.destroy()});` +
+        `s.on("error",e=>console.log("BLOCKED "+e.code));`,
+    );
+    expect(output).toContain("REACHED");
   });
 
   it("9. revocation tears down a tunnel that is already open", async () => {

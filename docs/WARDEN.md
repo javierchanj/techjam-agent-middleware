@@ -104,6 +104,22 @@ Everything else returns `path_not_allowed`.
 `NO_PROXY`/`no_proxy` name the broker, so the direct model request is not
 recursively sent through the broker as a proxy.
 
+## Policy administration is audited
+
+Applying a delegation profile is the one action that can loosen the whole
+system, so it is attributed and retained like any other decision:
+
+```
+GET /api/warden/policy/history
+[{ "at": "...", "actorId": "user:alice",
+   "fromTemplate": "model-only", "toTemplate": "model-plus-dev-tools",
+   "scopeSummary": "model:ark..., network:registry.npmjs.org, network:github.com" }]
+```
+
+The actor comes from the same `x-launchpad-actor` header the Playground uses.
+The tail is bounded at 100 entries and is in-memory: it records who changed the
+policy during a session, not a durable compliance log.
+
 ## Grant templates and dry-run checks
 
 Delegation is only useful if an operator can state it in one word and verify it
@@ -113,6 +129,7 @@ without running anything.
 | --- | --- |
 | `model-only` | Inference endpoint and nothing else |
 | `model-plus-github` | Inference plus `github.com`, `api.github.com`, `codeload.github.com` on 443 |
+| Node development (`model-plus-dev-tools`) | Inference, GitHub and `registry.npmjs.org` for Node.js development |
 | `no-external-network` | Nothing at all, including inference |
 
 Applying a template changes what the **next** run is delegated. Grants already
@@ -124,7 +141,7 @@ impossible on the network plane: an HTTPS request inside a CONNECT tunnel is
 opaque to the broker, which can enforce *where* the Agent connects but not *what*
 it sends. A template named "read-only" would claim a control that does not exist,
 and there is a test asserting no template is ever named that.
-
+| Node development (`model-plus-dev-tools`) | Inference, GitHub and `registry.npmjs.org` for Node.js development |
 Templates are the only way to change delegation. Ad-hoc allow/deny and budget
 mutation endpoints were removed: they widened the API surface without adding a
 capability the demo or the threat model needs.

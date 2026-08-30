@@ -135,8 +135,12 @@ export class WardenControlServer {
         return;
       }
       if (method === "POST" && path === "/control/policy/template") {
-        const payload = (await this.body(request)) as { id: string };
-        send(200, await this.control.applyTemplate(payload.id));
+        const payload = (await this.body(request)) as { id: string; actorId?: string };
+        send(200, await this.control.applyTemplate(payload.id, payload.actorId));
+        return;
+      }
+      if (method === "GET" && path === "/control/policy/history") {
+        send(200, await this.control.listPolicyChanges());
         return;
       }
       if (method === "POST" && path === "/control/policy/check") {
