@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, setAuthToken } from "./api";
+import WardenPanel from "./WardenPanel";
 import type { Agent, AgentRun, Message, SystemInfo } from "./types";
 
 const starterPrompts = [
@@ -601,6 +602,10 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <aside className="warden-rail">
+        <WardenPanel agentId={selectedId} />
+      </aside>
 
       {showCreate && (
         <div className="modal-backdrop" onMouseDown={() => setShowCreate(false)}>

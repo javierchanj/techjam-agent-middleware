@@ -1,4 +1,12 @@
 import type { Agent, AgentRun, Message, SystemInfo } from "./types";
+import type {
+  Grant,
+  PolicyCheckResult,
+  TemplateDescriptor,
+  TraceSummary,
+  WardenStatus,
+  WardenTrace,
+} from "./warden-types";
 
 export class ApiError extends Error {
   constructor(
@@ -78,4 +86,30 @@ export const api = {
       },
     ),
   run: (id: string) => request<{ run: AgentRun }>("/api/runs/" + id),
+
+  wardenStatus: () => request<WardenStatus>("/api/warden/status"),
+  wardenGrants: () => request<{ grants: Grant[] }>("/api/warden/grants"),
+  wardenTraces: (agentId?: string) =>
+    request<{ traces: TraceSummary[] }>(
+      "/api/warden/traces" + (agentId ? "?agentId=" + agentId : ""),
+    ),
+  wardenTrace: (traceId: string) =>
+    request<{ trace: WardenTrace }>("/api/warden/traces/" + traceId),
+  wardenRevoke: (grantId: string, reason: string) =>
+    request<{ grant: Grant }>("/api/warden/grants/" + grantId + "/revoke", {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  wardenTemplates: () =>
+    request<{ templates: TemplateDescriptor[] }>("/api/warden/templates"),
+  wardenApplyTemplate: (id: string) =>
+    request<{ policy: WardenStatus["policy"] }>("/api/warden/policy/template", {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    }),
+  wardenCheck: (host: string) =>
+    request<PolicyCheckResult>("/api/warden/policy/check", {
+      method: "POST",
+      body: JSON.stringify({ plane: "network", host, port: 443, method: "CONNECT" }),
+    }),
 };

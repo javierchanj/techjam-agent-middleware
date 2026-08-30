@@ -1096,3 +1096,300 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------- Warden */
+/* Evidence rail: the middleware's own view of what it allowed and refused. */
+
+.warden-rail {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border, #23262e);
+  overflow-y: auto;
+  padding: 16px 14px 32px;
+}
+
+.warden-panel h3 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.warden-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+
+.warden-sub,
+.warden-span-meta {
+  font-size: 11px;
+  opacity: 0.62;
+  font-variant-numeric: tabular-nums;
+}
+
+.warden-card {
+  border: 1px solid var(--border, #23262e);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.warden-card h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.72;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.warden-empty,
+.warden-notice {
+  font-size: 12px;
+  opacity: 0.7;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.warden-notice {
+  opacity: 0.9;
+  margin: 0 0 12px;
+}
+
+.warden-scopes,
+.warden-traces,
+.warden-spans {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.warden-scopes li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warden-scope-empty {
+  opacity: 0.6;
+}
+
+.warden-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.warden-tag-model_call { color: #6aa9ff; }
+.warden-tag-network_call { color: #c792ea; }
+.warden-tag-grant_lifecycle { color: #8f98a8; }
+.warden-tag-run { color: #6ee7a8; }
+
+.warden-chain {
+  font-size: 12px;
+  margin: 0 0 10px;
+  opacity: 0.8;
+  word-break: break-all;
+}
+
+.warden-meter { margin-bottom: 8px; }
+
+.warden-meter-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  opacity: 0.72;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warden-meter-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(127, 137, 153, 0.22);
+  overflow: hidden;
+}
+
+.warden-meter-fill { height: 100%; transition: width 240ms ease; }
+.warden-meter-ok { background: #6ee7a8; }
+.warden-meter-warn { background: #f0c674; }
+.warden-meter-over { background: #ff6b6b; }
+
+.warden-status {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.warden-status-active { background: rgba(110, 231, 168, 0.18); color: #6ee7a8; }
+.warden-status-revoked,
+.warden-status-exhausted { background: rgba(255, 107, 107, 0.18); color: #ff6b6b; }
+.warden-status-closed,
+.warden-status-expired { background: rgba(143, 152, 168, 0.18); color: #8f98a8; }
+
+.warden-revoke {
+  margin-top: 8px;
+  width: 100%;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  background: transparent;
+  color: #ff6b6b;
+  cursor: pointer;
+}
+
+.warden-revoke:disabled { opacity: 0.4; cursor: default; }
+.warden-revoke:not(:disabled):hover { background: rgba(255, 107, 107, 0.12); }
+
+.warden-trace {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #23262e);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.warden-trace-open { border-color: rgba(106, 169, 255, 0.6); }
+.warden-trace-denied { border-color: rgba(255, 107, 107, 0.45); }
+
+.warden-badge {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 107, 107, 0.18);
+  color: #ff6b6b;
+}
+
+.warden-spans { margin: 8px 0 4px; padding-left: 8px; border-left: 2px solid var(--border, #23262e); }
+
+.warden-span { padding: 6px 0 6px 10px; }
+.warden-span-denied { border-left: 2px solid #ff6b6b; margin-left: -12px; padding-left: 20px; }
+
+.warden-span-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.warden-span-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warden-span-time { margin-left: auto; opacity: 0.55; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.warden-deny {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #ff8f8f;
+}
+
+.warden-deny strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+@media (max-width: 1180px) {
+  .warden-rail { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .warden-meter-fill { transition: none; }
+}
+
+.warden-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 10px;
+  font-size: 11px;
+}
+
+.warden-facts dt { opacity: 0.6; }
+.warden-facts dd { margin: 0; text-align: right; }
+.warden-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.warden-templates { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.warden-template {
+  font-size: 11px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #23262e);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.warden-template:hover { border-color: rgba(106, 169, 255, 0.6); }
+
+.warden-template-active {
+  border-color: #6aa9ff;
+  color: #6aa9ff;
+  background: rgba(106, 169, 255, 0.12);
+}
+
+.warden-guarantees {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 11px;
+  opacity: 0.72;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.warden-guarantees li::before { content: "— "; opacity: 0.5; }
+
+.warden-probe { display: flex; gap: 6px; }
+
+.warden-probe input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #23262e);
+  background: transparent;
+  color: inherit;
+}
+
+.warden-probe button {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #23262e);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.warden-probe-allow { margin: 8px 0 0; font-size: 11px; line-height: 1.45; color: #6ee7a8; }
+.warden-probe-allow strong,
+.warden-deny strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
