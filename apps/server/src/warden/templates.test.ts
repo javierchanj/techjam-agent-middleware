@@ -112,7 +112,6 @@ describe("dry-run policy check", () => {
   });
 });
 
-
 describe('dry-run plane "any"', () => {
   it("reports the model host as ALLOWED, matching what the panel lists", async () => {
     // Checking only the network plane reported the model host as denied while
@@ -150,5 +149,35 @@ describe('dry-run plane "any"', () => {
       method: "CONNECT",
     });
     expect(result).toMatchObject({ allowed: true, matchedPlane: "network" });
+  });
+});
+
+describe("dry run agrees with the panel on a non-default model port", () => {
+  it("uses the model scope's own port rather than the UI's assumed 443", async () => {
+    const redactor = new Redactor();
+    // An ARK_BASE_URL on a custom port, e.g. a proxied or self-hosted endpoint.
+    const policy = new WardenPolicyStore(
+      [{ plane: "model", host: "ark.internal", ports: [8443], methods: ["POST"] }],
+      { maxModelCalls: 5, maxTotalTokens: 1_000, maxWallClockMs: 60_000 },
+    );
+    const c = new InProcessWardenControl({
+      vault: new GrantVault(redactor),
+      ledger: new WardenLedger(redactor),
+      policy,
+      grantTtlMs: 10_000,
+      gatewayPort: 8788,
+      internalNetwork: "net",
+      upstreamHost: "ark.internal",
+      upstreamPort: 8443,
+    });
+    // The panel lists ark.internal:8443 as reachable, so the check must agree
+    // even though the UI sends the default 443.
+    const result = await c.checkPolicy({
+      plane: "any",
+      host: "ark.internal",
+      port: 443,
+      method: "CONNECT",
+    });
+    expect(result).toMatchObject({ allowed: true, matchedPlane: "model" });
   });
 });

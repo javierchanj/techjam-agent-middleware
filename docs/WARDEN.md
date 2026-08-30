@@ -197,7 +197,7 @@ Known limitations:
 | Silent loss of enforcement | Fail-closed startup; internal flag verified | `broker-container.ts` |
 | Provider API abuse beyond inference | Path + method allowlist on the model plane | `gateway.test.ts` |
 | DNS rebinding to a private address | Resolve, screen the resolved address, pin the connection to it | `gateway.ts` |
-| Control API reachable from the Runtime | Broker resolves its own internal address and refuses to serve control on that interface | `control-server.ts` |
+| Control API reachable from the Runtime | Broker binds control to its egress interface ONLY, so the internal network cannot even complete a TCP handshake; a request-layer guard remains as defence in depth | `broker-main.ts`, `control-server.ts` |
 | Exfiltration continuing after revocation | Revocation tears down live tunnels and in-flight streams | `control.ts`, `gateway.ts` |
 | Runtime bypassing the network boundary | Real container on a real `--internal` network cannot reach 1.1.1.1:443 | `isolation.integration.test.ts` |
 
@@ -237,7 +237,7 @@ visible in the rail; it is not the thing being proven on stage.
 | `WARDEN_INTERNAL_NETWORK` | `launchpad-warden-internal` | Isolated Runtime network |
 | `WARDEN_EGRESS_NETWORK` | `launchpad-warden-egress` | Broker-only egress network |
 | `WARDEN_MAX_MODEL_CALLS` | `40` | Hard per-run call budget |
-| `WARDEN_MAX_TOTAL_TOKENS` | `120000` | Soft per-run token budget |
+| `WARDEN_MAX_TOTAL_TOKENS` | `500000` | Soft per-run token budget, metered from the provider's `usage` block. Sized from a measured run: 13 turns / 130,067 exact tokens on DeepSeek-V4-Flash with thinking enabled, per-call cost rising 7.2k to 12.4k as context accumulates. Raise only against exact counts — byte-estimated totals include SSE framing and overstate by roughly 5x. |
 | `WARDEN_MAX_WALL_CLOCK_MS` | `600000` | Hard per-run wall-clock budget |
 | `WARDEN_ALLOWED_NETWORK_HOSTS` | *(empty)* | Exact `host:port` entries. Empty = deny all. |
 | `WARDEN_MODEL_PATHS` | `POST /responses,POST /chat/completions,GET /models,GET /models/{id}` | Permitted provider surface |

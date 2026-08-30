@@ -253,3 +253,98 @@ describe("path matching is exact", () => {
     expect(isAllowedModelPath("GET", "/v1/models/../files", DEFAULT_MODEL_PATHS)).toBe(false);
   });
 });
+
+describe("usage parsing with nested detail blocks", () => {
+  // The shape a reasoning model actually returns. An earlier regex-based
+  // parser silently failed on this and estimated every call instead.
+  const REAL = '{"usage":{"input_tokens":84,"output_tokens":112,"total_tokens":196,' +
+    '"input_tokens_details":{"cached_tokens":0},' +
+    '"output_tokens_details":{"reasoning_tokens":96}},"status":"completed"}';
+
+  it("reads total_tokens through nested objects", () => {
+    expect(extractUsageTokens(REAL)).toEqual({ totalTokens: 196, estimated: false });
+  });
+
+  it("sums input and output when nested details are present and no total is", () => {
+    const noTotal = '{"usage":{"input_tokens":10,"output_tokens":7,' +
+      '"output_tokens_details":{"reasoning_tokens":5}}}';
+    expect(extractUsageTokens(noTotal)).toEqual({ totalTokens: 17, estimated: false });
+  });
+
+  it("takes the last usage block from a nested SSE stream", () => {
+    const stream = [
+      'data: {"usage":{"total_tokens":5,"output_tokens_details":{"reasoning_tokens":1}}}',
+      'data: {"usage":{"total_tokens":250,"output_tokens_details":{"reasoning_tokens":96}}}',
+      "data: [DONE]",
+    ].join("\n\n");
+    expect(extractUsageTokens(stream)).toEqual({ totalTokens: 250, estimated: false });
+  });
+
+  it("is not confused by braces inside string values", () => {
+    const tricky = '{"usage":{"note":"a } brace","total_tokens":42}}';
+    expect(extractUsageTokens(tricky)).toEqual({ totalTokens: 42, estimated: false });
+  });
+});
+
+describe("metering does not charge for failed upstream calls", () => {
+  let failing: Server;
+  let failingPort = 0;
+  let gw: WardenGateway;
+  let gwPort = 0;
+  let v: GrantVault;
+  let led: WardenLedger;
+
+  beforeEach(async () => {
+    failing = createServer((_request, response) => {
+      // Shape of a real Ark rejection: no usage block, non-trivial body.
+      response.writeHead(401, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        error: { code: "AuthenticationError", message: "The API key doesn't exist. Request id: 0217880809304" },
+      }));
+    });
+    await new Promise<void>((resolve) => failing.listen(0, "127.0.0.1", resolve));
+    const address = failing.address();
+    failingPort = typeof address === "object" && address ? address.port : 0;
+
+    const red = new Redactor();
+    led = new WardenLedger(red);
+    v = new GrantVault(red);
+    led.beginTrace({ traceId: "t", runId: "r", agentId: "a" });
+    gw = new WardenGateway({
+      vault: v, ledger: led, redactor: red,
+      upstreamBaseUrl: "http://127.0.0.1:" + failingPort + "/api/v3",
+      upstreamApiKey: ["ark", "dead", "beef", "key", "value"].join("-"),
+      host: "127.0.0.1", port: 0,
+    });
+    gwPort = (await gw.listen()).port;
+  });
+
+  afterEach(async () => {
+    await gw.close();
+    await new Promise<void>((resolve) => failing.close(() => resolve()));
+  });
+
+  it("charges zero tokens and does not latch the estimated flag on a 401", async () => {
+    const { grant, token } = v.mint({
+      agentId: "a", runId: "r", traceId: "t",
+      humanPrincipal: { kind: "human", id: "user:a", displayName: "A" },
+      agentPrincipal: { kind: "agent", id: "agent:a", displayName: "A" },
+      scopes: [{ plane: "model", host: "127.0.0.1", ports: [failingPort], methods: ["POST"] }],
+      budget: { maxModelCalls: 5, maxTotalTokens: 1_000, maxWallClockMs: 60_000 },
+      ttlMs: 60_000,
+    });
+    const response = await fetch("http://127.0.0.1:" + gwPort + "/v1/responses", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(response.status).toBe(401);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const after = v.get(grant.id);
+    // The call was attempted, so it counts against the CALL budget...
+    expect(after?.usage.modelCalls).toBe(1);
+    // ...but it produced no tokens, and accounting stays exact.
+    expect(after?.usage.totalTokens).toBe(0);
+    expect(after?.usage.estimated).toBe(false);
+  });
+});

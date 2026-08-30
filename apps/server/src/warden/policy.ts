@@ -237,7 +237,11 @@ export function evaluate(
         effect: "deny",
         code: "budget_tokens_exhausted",
         message:
-          "Token budget of " + grant.budget.maxTotalTokens + " reached for grant " + grant.id + ".",
+          "Token budget of " +
+          grant.budget.maxTotalTokens +
+          " reached for grant " +
+          grant.id +
+          ". Raise WARDEN_MAX_TOTAL_TOKENS if the task legitimately needs more.",
       };
     }
   }

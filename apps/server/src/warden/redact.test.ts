@@ -69,3 +69,32 @@ describe("Redactor", () => {
     expect(message).not.toContain(REAL_KEY);
   });
 });
+
+describe("real-world Ark key shapes", () => {
+  // Ark issues hyphenated UUID keys. An earlier pattern required 12+ unbroken
+  // alphanumerics after the prefix and matched none of them, so only the
+  // exact-value registry was protecting the configured key.
+  // Assembled at runtime rather than written as a literal. The fixture must have
+  // the exact SHAPE Ark issues for this test to mean anything, but a literal of
+  // that shape trips GitHub push protection -- and a fixture that cannot be
+  // committed is a fixture that gets quietly deleted later.
+  const HYPHENATED = ["ark", "00000000", "1111", "2222", "3333", "444444444444", "00000"].join("-");
+
+  it("redacts a hyphenated Ark key it was never told about", () => {
+    const redactor = new Redactor();
+    const output = redactor.redactString("leaked " + HYPHENATED + " in a payload");
+    expect(output).not.toContain(HYPHENATED);
+    expect(output).toContain("[redacted:ark_api_key]");
+  });
+
+  it("still redacts the underscore-style key shape", () => {
+    const redactor = new Redactor();
+    expect(redactor.redactString("ark_live9f2c8b1a4d7e6f3a")).not.toContain("9f2c8b1a");
+  });
+
+  it("does not eat ordinary words that merely begin with ark", () => {
+    const redactor = new Redactor();
+    expect(redactor.redactString("the ark-of-the-covenant")).toContain("covenant");
+    expect(redactor.redactString("arkansas is a state")).toBe("arkansas is a state");
+  });
+});

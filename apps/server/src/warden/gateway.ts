@@ -15,12 +15,57 @@ import type { Redactor } from "./redact.js";
 import { isBlockedLiteralAddress } from "./policy.js";
 import type { EgressPlane, Grant, PolicyDecision, SpanAttributeValue } from "./types.js";
 
-// Gateway acts as the security checkpoint. (Policy, grants, redactor and ledger combined here.)
-// All requests from agent should pass through this gateway.
-
 /** Bytes of response tail retained for token metering. Usage lands in the final event. */
 const USAGE_TAIL_BYTES = 65_536;
-const USAGE_PATTERN = /"usage"\s*:\s*(\{[^{}]*\})/g;
+/**
+ * Extracts the JSON object following a "usage" key by balancing braces.
+ *
+ * A regex cannot do this. `"usage"\s*:\s*\{[^{}]*\}` fails the moment the
+ * object contains a nested one -- and real providers nest:
+ *
+ *   "usage":{"input_tokens":84,"total_tokens":196,
+ *            "output_tokens_details":{"reasoning_tokens":96}}
+ *
+ * Reasoning models always send those detail blocks, so regex matching silently
+ * degraded every call to byte estimation.
+ */
+function usageBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  let index = text.indexOf('"usage"');
+  while (index !== -1) {
+    const open = text.indexOf("{", index);
+    if (open === -1) break;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let cursor = open; cursor < text.length; cursor += 1) {
+      const character = text[cursor];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (character === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (character === "{") depth += 1;
+      else if (character === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          blocks.push(text.slice(open, cursor + 1));
+          break;
+        }
+      }
+    }
+    index = text.indexOf('"usage"', index + 1);
+  }
+  return blocks;
+}
 
 /**
  * ModelArk surface the Runtime is permitted to reach. Anything else on the
@@ -38,6 +83,9 @@ export const DEFAULT_MODEL_PATHS: readonly string[] = [
  * Entries are exact `METHOD /path` matches. A trailing `/{id}` in an entry —
  * only `GET /models/{id}` by default — permits exactly one further segment,
  * and that segment may not contain a slash or a dot-segment.
+ *
+ * Exactness matters: an earlier version allowed one trailing segment on every
+ * entry, which silently permitted `POST /responses/anything`.
  */
 export function isAllowedModelPath(
   method: string,
@@ -72,12 +120,8 @@ export interface UsageReading {
  * Exported so metering is unit-testable without a live upstream.
  */
 export function extractUsageTokens(text: string): UsageReading | null {
-  USAGE_PATTERN.lastIndex = 0;
-  let lastBlock: string | null = null;
-  let match: RegExpExecArray | null;
-  while ((match = USAGE_PATTERN.exec(text)) !== null) {
-    lastBlock = match[1] ?? lastBlock;
-  }
+  const blocks = usageBlocks(text);
+  const lastBlock = blocks.length > 0 ? blocks[blocks.length - 1] : null;
   if (!lastBlock) return null;
   let parsed: Record<string, unknown>;
   try {
@@ -368,10 +412,18 @@ export class WardenGateway {
         });
         upstreamResponse.pipe(response);
         upstreamResponse.on("end", () => {
-          const reading = extractUsageTokens(tail) ?? {
-            totalTokens: estimateTokens(bytes),
-            estimated: true,
-          };
+          const status = upstreamResponse.statusCode ?? 500;
+          const failed = status >= 400;
+          // A failed upstream call consumed no model tokens. Charging an
+          // estimate for a 401 body inflates the budget AND latches the
+          // "partly estimated" flag for the rest of the grant, which made the
+          // panel report degraded accounting for a run that had none.
+          const reading: UsageReading = failed
+            ? { totalTokens: 0, estimated: false }
+            : (extractUsageTokens(tail) ?? {
+                totalTokens: estimateTokens(bytes),
+                estimated: true,
+              });
           const updated = this.options.vault.recordTokenUsage(
             grant.id,
             reading.totalTokens,
@@ -384,6 +436,7 @@ export class WardenGateway {
               response_bytes: bytes,
               tokens_charged: reading.totalTokens,
               tokens_estimated: reading.estimated,
+              upstream_failed: failed,
               tokens_used_total: updated?.usage.totalTokens ?? null,
               tokens_budget: grant.budget.maxTotalTokens,
               grant_status_after: updated?.status ?? null,

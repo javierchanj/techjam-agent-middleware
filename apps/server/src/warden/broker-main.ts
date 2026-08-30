@@ -86,7 +86,7 @@ const scopes: EgressScope[] = [
 
 const policy = new WardenPolicyStore(scopes, {
   maxModelCalls: integer("WARDEN_MAX_MODEL_CALLS", 40),
-  maxTotalTokens: integer("WARDEN_MAX_TOTAL_TOKENS", 2_500_000),
+  maxTotalTokens: integer("WARDEN_MAX_TOTAL_TOKENS", 500_000),
   maxWallClockMs: integer("WARDEN_MAX_WALL_CLOCK_MS", 600_000),
 });
 const ledger = new WardenLedger(redactor, { maxTraces: 200 });

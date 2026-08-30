@@ -61,7 +61,13 @@ const envSchema = z.object({
     .default("POST /responses,POST /chat/completions,GET /models,GET /models/{id}"),
   WARDEN_GRANT_TTL_MS: z.coerce.number().int().min(1_000).default(900_000),
   WARDEN_MAX_MODEL_CALLS: z.coerce.number().int().positive().default(40),
-  WARDEN_MAX_TOTAL_TOKENS: z.coerce.number().int().positive().default(2_500_000),
+  /**
+   * Soft per-run token budget. Measured against BytePlus DeepSeek-V4-Flash with
+   * thinking enabled: a small CLI task took 13 turns and 130,067 exact tokens,
+   * with per-call cost climbing 7.2k -> 12.4k as Codex resends accumulated
+   * context. 500k leaves room for a task roughly three times that size.
+   */
+  WARDEN_MAX_TOTAL_TOKENS: z.coerce.number().int().positive().default(500_000),
   WARDEN_MAX_WALL_CLOCK_MS: z.coerce.number().int().min(1_000).default(600_000),
   /** Comma-separated extra hosts the Agent may reach on the network plane. Empty = deny all. */
   WARDEN_ALLOWED_NETWORK_HOSTS: z.string().default(""),

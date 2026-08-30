@@ -218,3 +218,26 @@ describe("destination hardening", () => {
     expect(isBlockedLiteralAddress("ark.cn-beijing.volces.com")).toBe(false);
   });
 });
+
+describe("budget denials are actionable", () => {
+  it("names the knob an operator would turn", () => {
+    // A denial that only states the limit leaves the operator guessing. This
+    // was a real demo failure: the run died and the message did not say why
+    // the cap was that size or how to change it.
+    const decision = evaluate(
+      grantFixture({
+        usage: { modelCalls: 1, networkCalls: 0, totalTokens: 1_000, estimated: false },
+      }),
+      request(),
+    );
+    expect(decision).toMatchObject({ effect: "deny", code: "budget_tokens_exhausted" });
+    if (decision.effect === "deny") {
+      expect(decision.message).toContain("WARDEN_MAX_TOTAL_TOKENS");
+    }
+  });
+
+  it("keeps the wall-clock denial distinct from the token denial", () => {
+    const decision = evaluate(grantFixture(), request({ nowMs: T0 + 60_001 }));
+    expect(decision).toMatchObject({ effect: "deny", code: "budget_time_exhausted" });
+  });
+});

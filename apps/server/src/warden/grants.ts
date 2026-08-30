@@ -59,7 +59,29 @@ export class GrantVault {
   constructor(
     private readonly redactor: Redactor,
     private readonly clock: () => number = () => Date.now(),
+    /** Closed grants retained for evidence. Active grants are never evicted. */
+    private readonly maxRetainedGrants = 200,
   ) {}
+
+  /**
+   * Drops the oldest CLOSED grants once the store grows past its cap. Active,
+   * revoked and exhausted grants are kept: the first is still enforcing, and
+   * the others are the evidence an operator is most likely to look at.
+   */
+  private evictClosed(): void {
+    if (this.grants.size <= this.maxRetainedGrants) return;
+    const closed = [...this.grants.values()]
+      .filter((grant) => grant.status === "closed" || grant.status === "expired")
+      .sort((left, right) => left.issuedAt.localeCompare(right.issuedAt));
+    let excess = this.grants.size - this.maxRetainedGrants;
+    for (const grant of closed) {
+      if (excess <= 0) break;
+      this.grants.delete(grant.id);
+      this.byTokenHash.delete(grant.tokenHash);
+      this.liveTokens.delete(grant.id);
+      excess -= 1;
+    }
+  }
 
   mint(input: MintGrantInput): MintedGrant {
     const token = GRANT_TOKEN_PREFIX + randomBytes(32).toString("base64url");
@@ -85,6 +107,7 @@ export class GrantVault {
     this.grants.set(grant.id, grant);
     this.byTokenHash.set(grant.tokenHash, grant.id);
     this.liveTokens.set(grant.id, token);
+    this.evictClosed();
     this.redactor.register(token, "warden_grant_token");
     return { grant: structuredClone(grant), token };
   }

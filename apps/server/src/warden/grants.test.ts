@@ -119,3 +119,51 @@ describe("token custody", () => {
     expect(redactor.registeredCount).toBe(0);
   });
 });
+
+describe("grant retention", () => {
+  it("evicts old closed grants but never an active one", () => {
+    const redactor = new Redactor();
+    const vault = new GrantVault(redactor, () => Date.now(), 5);
+    const mintOne = (index: number) =>
+      vault.mint({
+        agentId: "a", runId: "run" + index, traceId: "t" + index,
+        humanPrincipal: { kind: "human", id: "user:a", displayName: "A" },
+        agentPrincipal: { kind: "agent", id: "agent:a", displayName: "A" },
+        scopes, budget, ttlMs: 60_000,
+      });
+
+    const keptActive = mintOne(0);
+    for (let index = 1; index <= 20; index += 1) {
+      const minted = mintOne(index);
+      vault.close(minted.grant.id, "run finished");
+    }
+
+    const remaining = vault.list();
+    expect(remaining.length).toBeLessThanOrEqual(5);
+    // The still-enforcing grant must survive eviction.
+    expect(remaining.some((grant) => grant.id === keptActive.grant.id)).toBe(true);
+    expect(vault.resolveByToken(keptActive.token)?.id).toBe(keptActive.grant.id);
+  });
+
+  it("keeps revoked grants, which are the evidence an operator looks at", () => {
+    const redactor = new Redactor();
+    const vault = new GrantVault(redactor, () => Date.now(), 3);
+    const revoked = vault.mint({
+      agentId: "a", runId: "r", traceId: "t",
+      humanPrincipal: { kind: "human", id: "user:a", displayName: "A" },
+      agentPrincipal: { kind: "agent", id: "agent:a", displayName: "A" },
+      scopes, budget, ttlMs: 60_000,
+    });
+    vault.revoke(revoked.grant.id, "operator kill switch");
+    for (let index = 0; index < 12; index += 1) {
+      const minted = vault.mint({
+        agentId: "a", runId: "r" + index, traceId: "t" + index,
+        humanPrincipal: { kind: "human", id: "user:a", displayName: "A" },
+        agentPrincipal: { kind: "agent", id: "agent:a", displayName: "A" },
+        scopes, budget, ttlMs: 60_000,
+      });
+      vault.close(minted.grant.id, "run finished");
+    }
+    expect(vault.get(revoked.grant.id)?.status).toBe("revoked");
+  });
+});

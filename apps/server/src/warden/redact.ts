@@ -21,7 +21,11 @@ interface PatternRule {
 
 const PATTERN_RULES: PatternRule[] = [
   { label: "authorization_header", pattern: /\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{12,}/gi },
-  { label: "ark_api_key", pattern: /\bark[_-][A-Za-z0-9]{12,}\b/gi },
+  // Real Ark keys are hyphenated UUIDs -- "ark-" + UUID + numeric suffix.
+  // Requiring 12+ unbroken alphanumerics missed every one of them; only the
+  // exact-value registry was catching the configured key.
+  { label: "ark_api_key", pattern: /\bark[_-][A-Za-z0-9]{4,}(?:-[A-Za-z0-9]{4,}){2,}\b/gi },
+  { label: "ark_api_key", pattern: /\bark[_-][A-Za-z0-9]{20,}\b/gi },
   { label: "aws_access_key_id", pattern: /\bAKIA[0-9A-Z]{16}\b/g },
   { label: "openai_style_key", pattern: /\bsk-[A-Za-z0-9]{16,}\b/g },
   { label: "warden_grant_token", pattern: /\bwgt_[A-Za-z0-9_-]{16,}\b/g },

@@ -57,6 +57,12 @@ export interface PolicySnapshot {
 }
 
 export interface PolicyCheckInput {
+  /**
+   * "any" asks the question an operator actually means: is this destination
+   * reachable AT ALL. Checking only the network plane reports the model host as
+   * denied even while the panel lists it as reachable, which reads as a
+   * contradiction.
+   */
   plane: EgressPlane | "any";
   host: string;
   port: number;
@@ -303,10 +309,15 @@ export class InProcessWardenControl implements WardenControl {
 
     let lastDenial: { code: string; message: string } | null = null;
     for (const plane of planes) {
+      // The UI cannot know which port the model plane runs on, so it always
+      // sends 443. Use the scope's declared port instead, or a custom
+      // ARK_BASE_URL port would make the dry run contradict the panel above it.
+      const modelPort = snapshot.scopes.find((scope) => scope.plane === "model")?.ports[0];
+      const port = plane === "model" && modelPort !== undefined ? modelPort : input.port;
       const decision = evaluate(synthetic, {
         plane,
         host: input.host,
-        port: input.port,
+        port,
         method: plane === "model" ? "POST" : input.method,
         path: plane === "model" ? "/v1/responses" : "",
         nowMs: now,
