@@ -1,5 +1,12 @@
 # Volc Agent Launchpad
 
+> **Warden middleware.** This fork replaces the Runtime's ambient provider
+> credential and open internet access with a run-scoped, brokered, revocable
+> capability. See [docs/WARDEN.md](docs/WARDEN.md) for the architecture, threat
+> model, honest limitations and demo script. Set `WARDEN_ENABLED=false` to run
+> the unmodified baseline.
+
+
 A minimal Agent platform for three-day middleware hackathons. It provides Agent
 CRUD, a browser Playground, persistent workspaces, and Codex CLI backed by the
 Volcengine Ark Responses API.
