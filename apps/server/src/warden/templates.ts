@@ -79,12 +79,12 @@ export const GRANT_TEMPLATES: readonly GrantTemplate[] = [
   },
   {
     id: "no-external-network",
-    label: "Fully offline",
+    label: "Deny all",
     description:
-      "No egress at all, including inference. For Agents that only operate on files already in the workspace.",
+      "Emergency and demo kill switch: a new Playground turn is denied before inference because no egress is delegated.",
     guarantees: [
       "Every outbound request is denied, including model calls",
-      "Useful for reproducing a run with zero external dependencies",
+      "A new Codex turn cannot execute while this profile is active",
     ],
     build: () => [],
   },

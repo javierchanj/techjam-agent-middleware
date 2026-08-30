@@ -158,17 +158,23 @@ try {
  * The request-layer guard below stays as defence in depth, for the case where
  * the address set changes under us at runtime.
  */
-const localAddresses = Object.values(networkInterfaces())
-  .flat()
-  .filter((entry) => entry && entry.family === "IPv4" && !entry.internal)
-  .map((entry) => entry?.address ?? "")
-  .filter((address) => address.length > 0);
+const unsafeInterfaceGuard = process.env.WARDEN_UNSAFE_SKIP_INTERFACE_GUARD === "1";
+// The host-process smoke harness deliberately skips interface discovery. Do
+// not call networkInterfaces() in that mode: restricted CI/container
+// environments can deny the syscall even though no interface result is needed.
+const localAddresses = unsafeInterfaceGuard
+  ? []
+  : Object.values(networkInterfaces())
+      .flat()
+      .filter((entry) => entry && entry.family === "IPv4" && !entry.internal)
+      .map((entry) => entry?.address ?? "")
+      .filter((address) => address.length > 0);
 const egressAddresses = localAddresses.filter(
   (address) => !internalAddresses.includes(address),
 );
 
 let controlBindAddress: string;
-if (process.env.WARDEN_UNSAFE_SKIP_INTERFACE_GUARD === "1") {
+if (unsafeInterfaceGuard) {
   // Development only: the broker is running as a host process, where there is
   // no internal network to keep the control API off.
   controlBindAddress = "0.0.0.0";

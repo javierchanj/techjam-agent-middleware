@@ -1282,6 +1282,22 @@ textarea:focus {
 
 .warden-trace-open { border-color: var(--purple); }
 .warden-trace-denied { border-color: rgba(197, 83, 83, 0.45); }
+.warden-trace-has-denials { border-color: rgba(201, 153, 61, 0.5); }
+
+.warden-run-status {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(119, 120, 112, 0.12);
+  color: var(--muted);
+}
+
+.warden-run-status-ok { background: rgba(51, 144, 109, 0.12); color: var(--green); }
+.warden-run-status-running { background: var(--purple-soft); color: var(--purple); }
+.warden-run-status-denied,
+.warden-run-status-error { background: rgba(197, 83, 83, 0.10); color: var(--red); }
 
 .warden-badge {
   margin-left: auto;
@@ -1346,6 +1362,9 @@ textarea:focus {
 .warden-templates { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .warden-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   padding: 5px 9px;
   border-radius: 999px;
@@ -1353,6 +1372,11 @@ textarea:focus {
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+.warden-template-check {
+  font-size: 10px;
+  line-height: 1;
 }
 
 .warden-template:hover { border-color: var(--purple); }

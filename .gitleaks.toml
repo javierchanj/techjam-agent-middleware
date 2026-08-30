@@ -1,0 +1,22 @@
+title = "Warden secret scanning"
+
+[extend]
+useDefault = true
+
+# Gitleaks scans the complete Git history. These exact, non-production strings
+# exist in older Warden test commits and can trigger the generic-api-key rule.
+# New fixtures are assembled at runtime; this list exists only so historical
+# false positives do not hide a new finding. Never add a real credential here.
+[[allowlists]]
+description = "Historical synthetic Warden fixtures only"
+regexTarget = "match"
+regexes = [
+  '''ark_live_smoke_secret_value_abc123''',
+  '''ark_live_9f2c8b1a4d7e6f3a2b5c8d1e''',
+  '''ark_live_never_leaves_the_host_1234''',
+  '''ark_live_integration_only_''',
+  '''ark_live_host_only_secret_value_9''',
+  '''ark_live_upstream_secret_value_123''',
+  '''secret-that-must-not-appear-in-argv''',
+  '''smoke-secret-token''',
+]

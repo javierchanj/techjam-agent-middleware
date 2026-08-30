@@ -9,7 +9,7 @@ describe("Container Codex runner", () => {
   it("builds an isolated Docker/Podman-compatible invocation", () => {
     const config = loadConfig({
       NODE_ENV: "test",
-      ARK_API_KEY: "secret-that-must-not-appear-in-argv",
+      ARK_API_KEY: ["runtime", "credential", "fixture"].join("-"),
       ARK_MODEL: "ep-test",
       CODEX_HOME: "/tmp/codex-home",
       RUNTIME_PROVIDER: "container",

@@ -130,7 +130,7 @@ without running anything.
 | `model-only` | Inference endpoint and nothing else |
 | `model-plus-github` | Inference plus `github.com`, `api.github.com`, `codeload.github.com` on 443 |
 | Node development (`model-plus-dev-tools`) | Inference, GitHub and `registry.npmjs.org` for Node.js development |
-| `no-external-network` | Nothing at all, including inference |
+| Deny all (`no-external-network`) | Emergency/demo kill switch. Nothing is delegated, including inference; a new Playground turn is expected to fail. |
 
 Applying a template changes what the **next** run is delegated. Grants already
 issued keep the scopes they were minted with, so a run's authority is stable for
@@ -242,6 +242,34 @@ through the real Playground, and Warden blocks the real network action.
 Deliberately **not** in the demo: live budget editing, and token-exhaustion,
 which depends on the provider's streaming usage format. Token metering stays
 visible in the rail; it is not the thing being proven on stage.
+
+### Secret-handling demo
+
+Blocking a destination proves network policy; it does not by itself prove that
+the provider credential stayed out of the Agent Runtime. Warden includes a
+separate, deterministic host-side proof for that boundary.
+
+1. Start `npm run poc` and create or select an Agent.
+2. Start this Playground task so the disposable Runtime remains alive long
+   enough to inspect safely:
+
+   ```text
+   Run node -e "setTimeout(() => console.log('secret-proof-ready'), 60000)"
+   and wait for it to finish. Do not inspect or print environment variables.
+   ```
+
+3. While that Run is active, open a second terminal in the repository and run:
+
+   ```bash
+   npm run warden:secret-proof
+   ```
+
+The script reads container inspection data only in memory and never prints a
+credential. It proves that the broker holds the provider key, the Runtime holds
+only a `wgt_` grant, the public grant fingerprint matches that live grant, no
+credential is present in Runtime argv, and neither raw value appears in public
+grants, traces, Runs, messages or system data. Click **Revoke access** afterward
+to reuse the same active Run for the kill-switch demonstration.
 
 ## Configuration
 

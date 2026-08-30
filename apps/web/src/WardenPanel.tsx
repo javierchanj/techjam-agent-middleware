@@ -189,8 +189,8 @@ export default function WardenPanel({ agentId }: { agentId: string | null }) {
   }
 
   // Both planes are read from the live policy. Asserting the model host from
-  // status.upstreamHost would keep claiming model access under the fully
-  // offline template, which grants no model scope at all.
+  // status.upstreamHost would keep claiming model access under the deny-all
+  // template, which grants no model scope at all.
   const modelHosts = status.policy.scopes.filter((scope) => scope.plane === "model");
   const networkHosts = status.policy.scopes.filter((scope) => scope.plane === "network");
 
@@ -212,12 +212,18 @@ export default function WardenPanel({ agentId }: { agentId: string | null }) {
                 key={template.id}
                 type="button"
                 title={template.description}
+                aria-pressed={status.policy.templateId === template.id}
                 className={
                   "warden-template" +
                   (status.policy.templateId === template.id ? " warden-template-active" : "")
                 }
                 onClick={() => void applyTemplate(template.id)}
               >
+                {status.policy.templateId === template.id && (
+                  <span className="warden-template-check" aria-hidden="true">
+                    ✓
+                  </span>
+                )}
                 {template.label}
               </button>
             ))}
@@ -347,7 +353,12 @@ export default function WardenPanel({ agentId }: { agentId: string | null }) {
                   type="button"
                   className={
                     "warden-trace" +
-                    (trace.deniedCount > 0 ? " warden-trace-denied" : "") +
+                    (trace.status === "denied" || trace.status === "error"
+                      ? " warden-trace-denied"
+                      : "") +
+                    (trace.deniedCount > 0 && trace.status === "ok"
+                      ? " warden-trace-has-denials"
+                      : "") +
                     (openTraceId === trace.traceId ? " warden-trace-open" : "")
                   }
                   onClick={() =>
@@ -355,9 +366,14 @@ export default function WardenPanel({ agentId }: { agentId: string | null }) {
                   }
                 >
                   <span>{clock(trace.startedAt)}</span>
+                  <span className={"warden-run-status warden-run-status-" + trace.status}>
+                    {trace.status === "ok" ? "completed" : trace.status}
+                  </span>
                   <span>{trace.spanCount} steps</span>
                   {trace.deniedCount > 0 && (
-                    <span className="warden-badge">{trace.deniedCount} blocked</span>
+                    <span className="warden-badge">
+                      {trace.deniedCount} request{trace.deniedCount === 1 ? "" : "s"} denied
+                    </span>
                   )}
                 </button>
                 {openTraceId === trace.traceId && openTrace && (

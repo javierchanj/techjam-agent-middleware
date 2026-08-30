@@ -3,7 +3,7 @@ import { buildContainerRunArgs } from "../container-codex-runner.js";
 import { loadConfig } from "../config.js";
 import type { RunnerRequest } from "../types.js";
 
-const REAL_KEY = "ark_live_never_leaves_the_host_1234";
+const REAL_KEY = ["ark", "live", "runtime", "fixture", "1234"].join("_");
 
 const config = loadConfig({
   ARK_API_KEY: REAL_KEY,

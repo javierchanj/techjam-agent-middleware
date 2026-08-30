@@ -33,7 +33,7 @@ const GATEWAY_PORT = 8788;
 const CONTROL_PORT = 18789;
 const FAKE_ARK_PORT = 18790;
 const SECRET = randomBytes(16).toString("hex");
-const REAL_KEY = "ark_live_integration_only_" + randomBytes(6).toString("hex");
+const REAL_KEY = ["ark", "live", "integration", randomBytes(6).toString("hex")].join("_");
 
 const distDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 

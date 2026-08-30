@@ -35,9 +35,14 @@ Verify it:
 
 ```bash
 npm run check                                            # unit tests + build
-node scripts/warden-smoke.mjs                            # broker, no Docker needed
+npm run warden:smoke                                     # broker, no Docker needed
 WARDEN_DOCKER_TESTS=1 npm run test -w @launchpad/server   # real two-network topology
 ```
+
+To prove the credential boundary without displaying a secret, start a long
+Agent turn and run `npm run warden:secret-proof` in a second terminal. The proof
+checks the live broker, Runtime, public grants, traces, Runs and messages and
+prints only PASS/FAIL evidence. See [Secret-handling demo](docs/WARDEN.md#secret-handling-demo).
 
 Architecture, threat model, honest limitations and the three-minute demo script
 are in **[docs/WARDEN.md](docs/WARDEN.md)**. The sections below describe the
@@ -52,9 +57,10 @@ Run it locally with Docker, Colima, or rootless Podman, or deploy it to
 Volcengine ECS.
 
 > [!WARNING]
-> This is a single-user proof of concept. It intentionally has no identity,
-> tracing, audit, or hardened sandbox middleware. Do not use production data or
-> credentials. See [SECURITY.md](SECURITY.md).
+> This remains a single-user proof of concept. Warden adds run-scoped delegation,
+> brokered egress, revocation and redacted traces on the official `npm run poc`
+> path; it does not add production identity, tenant isolation or a hardened
+> multi-tenant sandbox. See [SECURITY.md](SECURITY.md).
 
 ## Screenshots
 
@@ -74,13 +80,14 @@ Volcengine ECS.
 - Persistent Agent workspaces and Codex sessions
 - Disposable Docker, Colima, or Podman container for each local turn
 - Docker and Terraform deployment paths for Volcengine ECS
+- Warden run grants, destination policy, revocation, budgets and redacted traces
 
 ## Requirements
 
 - Node.js 22+
 - npm 10+
 - Docker, Colima, or Podman
-- A Volcengine Ark API key and endpoint that supports the Responses API
+- A BytePlus ModelArk API key and endpoint that supports the Responses API
 
 Codex CLI is included in the Runtime image and is not required on the host.
 
@@ -277,6 +284,8 @@ boundaries.
 
 ```bash
 npm run check
+npm run warden:smoke
+WARDEN_DOCKER_TESTS=1 npm run test -w @launchpad/server
 terraform fmt -check -recursive deploy/volcengine
 docker compose config
 ```

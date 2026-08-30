@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Redactor, redactedMessage } from "./redact.js";
 
-const REAL_KEY = "ark_live_9f2c8b1a4d7e6f3a2b5c8d1e";
+const REAL_KEY = ["ark", "live", "9f2c8b1a4d7e6f3a2b5c8d1e"].join("_");
 
 describe("Redactor", () => {
   it("removes every occurrence of a registered secret", () => {
@@ -89,7 +89,8 @@ describe("real-world Ark key shapes", () => {
 
   it("still redacts the underscore-style key shape", () => {
     const redactor = new Redactor();
-    expect(redactor.redactString("ark_live9f2c8b1a4d7e6f3a")).not.toContain("9f2c8b1a");
+    const key = ["ark", "live9f2c8b1a4d7e6f3a"].join("_");
+    expect(redactor.redactString(key)).not.toContain("9f2c8b1a");
   });
 
   it("does not eat ordinary words that merely begin with ark", () => {

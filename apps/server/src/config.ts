@@ -185,6 +185,13 @@ export async function writeCodexConfig(config: AppConfig): Promise<void> {
     'wire_api = "responses"',
     "requires_openai_auth = false",
     "",
+    // Codex otherwise exports optional client metrics to ab.chatgpt.com. That
+    // destination is unrelated to the Agent's task and creates a policy denial
+    // on every otherwise-successful Warden run. Disable it rather than widening
+    // the Agent's delegated network scope for telemetry it does not need.
+    "[otel]",
+    'metrics_exporter = "none"',
+    "",
   ].join("\n");
   await writeFile(path.join(config.codexHome, "config.toml"), toml, {
     encoding: "utf8",

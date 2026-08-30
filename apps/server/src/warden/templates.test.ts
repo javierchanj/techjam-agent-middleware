@@ -42,8 +42,11 @@ describe("grant templates", () => {
     expect(scopes[0]?.plane).toBe("model");
   });
 
-  it("fully offline permits nothing at all", () => {
-    expect(findTemplate("no-external-network")?.build("ark.test", 443)).toEqual([]);
+  it("describes the deny-all profile as a kill switch that permits nothing", () => {
+    const template = findTemplate("no-external-network");
+    expect(template?.label).toBe("Deny all");
+    expect(template?.description).toMatch(/denied before inference/i);
+    expect(template?.build("ark.test", 443)).toEqual([]);
   });
 
   it("describes templates without leaking the build function to the API", () => {
@@ -244,7 +247,7 @@ describe("policy administration is audited", () => {
     expect((await c.listPolicyChanges())[0]?.actorId).toBe("user:local");
   });
 
-  it("records the fully offline profile as granting no egress", async () => {
+  it("records the deny-all profile as granting no egress", async () => {
     const c = control();
     await c.applyTemplate("no-external-network", "user:alice");
     expect((await c.listPolicyChanges())[0]?.scopeSummary).toBe("no egress");

@@ -8,7 +8,7 @@ import { WardenRunner } from "./warden-runner.js";
 import type { AgentRunner, RunnerRequest, RunnerResult } from "../types.js";
 import type { Budget, EgressScope } from "./types.js";
 
-const REAL_KEY = "ark_live_host_only_secret_value_9";
+const REAL_KEY = ["ark", "live", "host", "fixture", "9"].join("_");
 
 const scopes: EgressScope[] = [
   { plane: "model", host: "ark.test", ports: [443], methods: ["POST"] },

@@ -14,7 +14,7 @@ import { WardenLedger } from "./ledger.js";
 import { Redactor } from "./redact.js";
 import type { Budget, EgressScope } from "./types.js";
 
-const REAL_KEY = "ark_live_upstream_secret_value_123";
+const REAL_KEY = ["ark", "live", "upstream", "fixture", "123"].join("_");
 
 describe("usage metering", () => {
   it("reads total_tokens from a JSON response", () => {

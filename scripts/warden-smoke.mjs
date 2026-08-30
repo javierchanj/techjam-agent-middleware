@@ -10,8 +10,10 @@
  */
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
 
-const REAL_KEY = "ark_live_smoke_secret_value_abc123";
+const REAL_KEY = ["ark", "live", "smoke", "fixture", "abc123"].join("_");
+const CONTROL_SECRET = ["smoke", "control", "fixture"].join("-");
 
 /** Fails loudly. Without this the script exits 0 even when Warden is broken. */
 let failures = 0;
@@ -27,10 +29,13 @@ const upstream = createServer((req, res) => {
 await new Promise((r) => upstream.listen(0, "127.0.0.1", r));
 const up = upstream.address().port;
 
-const broker = spawn("node", [new URL("../apps/server/dist/warden/broker-main.js", import.meta.url).pathname], {
+const brokerEntrypoint = fileURLToPath(
+  new URL("../apps/server/dist/warden/broker-main.js", import.meta.url),
+);
+const broker = spawn("node", [brokerEntrypoint], {
   env: { ...process.env, PATH: process.env.PATH,
     WARDEN_UPSTREAM_BASE_URL: `http://127.0.0.1:${up}/api/v3`,
-    ARK_API_KEY: REAL_KEY, WARDEN_CONTROL_SECRET: "smoke-secret-token",
+    ARK_API_KEY: REAL_KEY, WARDEN_CONTROL_SECRET: CONTROL_SECRET,
     WARDEN_PORT: "8798", WARDEN_CONTROL_PORT: "8799",
     WARDEN_ALLOWED_NETWORK_HOSTS: "api.github.com:443", WARDEN_UNSAFE_SKIP_INTERFACE_GUARD: "1" },
   stdio: ["ignore", "pipe", "pipe"] });
@@ -56,7 +61,7 @@ process.on("exit", cleanup);
 broker.stderr.on("data", (d) => process.stdout.write("  broker!: " + d));
 
 const { RemoteWardenControl } = await import(new URL("../apps/server/dist/warden/control-client.js", import.meta.url).href);
-const control = new RemoteWardenControl("http://127.0.0.1:8799", "smoke-secret-token");
+const control = new RemoteWardenControl("http://127.0.0.1:8799", CONTROL_SECRET);
 for (let i = 0; i < 40 && !(await control.health()); i++) await new Promise(r => setTimeout(r, 100));
 const healthy = await control.health();
 console.log("1. broker healthy:", healthy);
