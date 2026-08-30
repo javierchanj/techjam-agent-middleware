@@ -191,6 +191,18 @@ describe.skipIf(!enabled)("Warden live topology", () => {
     expect(output).not.toContain("REACHED");
   });
 
+  it("8b. the gateway IS reachable, so test 8 proves isolation and not breakage", async () => {
+    // Same host, different port. If this also failed, test 8 would be passing
+    // for the wrong reason -- the broker being unreachable altogether.
+    const output = await inRuntime(
+      `const net=require("node:net");const s=net.connect({host:"${ALIAS}",port:${GATEWAY_PORT},timeout:5000});` +
+        `s.on("connect",()=>{console.log("REACHED");s.destroy()});` +
+        `s.on("timeout",()=>{console.log("BLOCKED");s.destroy()});` +
+        `s.on("error",e=>console.log("BLOCKED "+e.code));`,
+    );
+    expect(output).toContain("REACHED");
+  });
+
   it("5. a forged grant is refused", async () => {
     const output = await inRuntime(
       `const r = await fetch("http://${ALIAS}:${GATEWAY_PORT}/v1/responses",` +

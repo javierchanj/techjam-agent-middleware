@@ -12,6 +12,7 @@
  * package installation and no extra image build.
  */
 import { lookup } from "node:dns/promises";
+import { networkInterfaces } from "node:os";
 import { WardenControlServer } from "./control-server.js";
 import { InProcessWardenControl } from "./control.js";
 import { WardenGateway } from "./gateway.js";
@@ -146,10 +147,50 @@ try {
   );
 }
 
+/**
+ * Bind the control API to the EGRESS interface only.
+ *
+ * A request-layer guard is not enough: binding 0.0.0.0 still completes the TCP
+ * handshake on the internal interface, so a Runtime can confirm the port is
+ * open even though it can never get a response. Not listening there at all is
+ * the property we actually want, and the one the integration test asserts.
+ *
+ * The request-layer guard below stays as defence in depth, for the case where
+ * the address set changes under us at runtime.
+ */
+const localAddresses = Object.values(networkInterfaces())
+  .flat()
+  .filter((entry) => entry && entry.family === "IPv4" && !entry.internal)
+  .map((entry) => entry?.address ?? "")
+  .filter((address) => address.length > 0);
+const egressAddresses = localAddresses.filter(
+  (address) => !internalAddresses.includes(address),
+);
+
+let controlBindAddress: string;
+if (process.env.WARDEN_UNSAFE_SKIP_INTERFACE_GUARD === "1") {
+  // Development only: the broker is running as a host process, where there is
+  // no internal network to keep the control API off.
+  controlBindAddress = "0.0.0.0";
+  process.stdout.write(
+    "[warden] WARNING: binding control to 0.0.0.0 (development only)\n",
+  );
+} else if (egressAddresses.length === 1) {
+  controlBindAddress = egressAddresses[0] as string;
+} else {
+  // Fail closed: if we cannot single out the egress interface we cannot keep
+  // the control API off the Runtime network.
+  throw new Error(
+    "Could not identify a single egress interface for the control API. " +
+      "Found [" + localAddresses.join(", ") + "], internal [" +
+      internalAddresses.join(", ") + "]. Refusing to start.",
+  );
+}
+
 const controlServer = new WardenControlServer(
   control,
   controlSecret,
-  "0.0.0.0",
+  controlBindAddress,
   controlPort,
   internalAddresses,
 );
@@ -163,6 +204,8 @@ process.stdout.write(
     controlAddress +
     " upstream=" +
     upstream.hostname +
+    " control-bound-to=" +
+    controlBindAddress +
     " control-blocked-on=" +
     (internalAddresses.join(",") || "none") +
     "\n",
