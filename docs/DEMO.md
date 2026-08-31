@@ -78,6 +78,12 @@ that Agent's persistent workspace. It does not copy the repository or expose a
 credential. The fixture attempts both direct TCP and brokered CONNECT to the
 undelegated test destination `1.1.1.1:443`.
 
+It also verifies the Node project from step 2 by installing its dependencies and
+running `npm start`, and accepts the project the Agent wrote as long as it
+prints a `task_` identifier. If the workspace is empty it writes an equivalent
+project instead. An unrelated existing project is refused rather than
+overwritten; rerun with `--force` only if you intend to replace it.
+
 ### 4. Preflight without changing the workspace
 
 Start a new Playground Run with:

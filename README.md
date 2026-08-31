@@ -1,41 +1,36 @@
-# Volc Agent Launchpad
+# Warden Officer
 
-## Warden — the submission
+> Agents get a temporary key and a locked door instead of your production
+> credential and the open internet.
 
-This fork adds **Warden**, middleware that replaces the Runtime's ambient
-provider credential and open internet access with a run-scoped, brokered,
-metered and revocable capability.
+Built on the CodeJam Agent Launchpad starter kit. The starter kit hands every
+disposable Runtime container two things, in `apps/server/src/container-codex-runner.ts`:
 
-## Warden at a glance
+```ts
+"--network", "bridge",     // unrestricted outbound internet
+"--env", "ARK_API_KEY",    // the real provider credential
+```
 
-Warden preserves the starter Agent platform while moving credential and network
-authority out of the untrusted Runtime.
+That container runs model-authored code. **Warden Officer** replaces both with a
+run-scoped capability: the Runtime holds only a short-lived `wgt_` grant, has no
+direct Internet route, and every request it makes is authorised at a trusted
+broker that a human controls and the Agent cannot reach.
 
-<p align="center">
-  <a href="docs/WARDEN_ARCHITECTURE.md">
-    <img
-      src="docs/assets/warden-demo-flow.svg"
-      alt="Warden run flow showing scoped delegation, broker enforcement, denial, evidence and revocation"
-      width="100%"
-    />
-  </a>
-</p>
+## Quick start — the verified Warden path
 
-The Runtime receives only a temporary `wgt_` grant. The trusted Warden broker
-holds the provider credential, enforces destination and budget policy, records
-correlated evidence, and can revoke the exact active Run.
-
-See the [complete Warden architecture](docs/WARDEN_ARCHITECTURE.md) and
-[three-minute demonstration guide](docs/DEMO.md).
-
-**Judging path — this is the one that runs Warden:**
+Requires Node.js 22+, npm 10+, Docker, and your own ModelArk key and endpoint.
+The repository intentionally contains neither.
 
 ```bash
+git clone <this-repo> && cd CodeJam
 ARK_API_KEY=<ark model api key> \
 ARK_MODEL=ep-<endpoint id> \
 ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3 \
 npm run poc
 ```
+
+Open <http://localhost:3000>. The Warden rail on the right should show a broker
+address rather than "The egress broker is off." Create an Agent and send a task.
 
 `ARK_BASE_URL` matters: the starter default points at Volcengine
 (`ark.cn-beijing.volces.com`). A **BytePlus** key sent there returns
@@ -53,7 +48,49 @@ local-process Runtime, which shares the host network and cannot satisfy its
 isolation invariant. `WARDEN_ENABLED=auto` (the default) enables it exactly
 where it can hold.
 
-Verify it:
+## Reproduce the demonstration
+
+```bash
+npm run warden:demo:prepare -- --agent "Warden Demo Agent"
+```
+
+Then follow **[docs/DEMO.md](docs/DEMO.md)** — a timed three-minute script
+covering the normal Run, a denied exfiltration attempt at two layers, the
+credential proof, and revocation with recovery.
+
+## What Warden changes
+
+| | Starter kit | With Warden |
+| --- | --- | --- |
+| Runtime credential | real `ARK_API_KEY` | short-lived `wgt_` grant |
+| Runtime egress | `--network bridge`, unrestricted | internal network, broker is the only route |
+| Provider surface | entire API | inference paths only |
+| Cost control | none | model-call, wall-clock and token budgets |
+| Mid-run control | none | revoke authority, tear down live tunnels, cancel the Run |
+| Evidence | none | correlated per-Run trace, redacted at write |
+
+The Runtime receives only a temporary `wgt_` grant. The trusted Warden broker
+holds the provider credential, enforces destination and budget policy, records
+correlated evidence, and can revoke the exact active Run.
+
+## Architecture
+
+<p align="center">
+  <a href="docs/WARDEN_ARCHITECTURE.md">
+    <img
+      src="docs/assets/warden-demo-flow.svg"
+      alt="Warden run flow showing scoped delegation, broker enforcement, denial, evidence and revocation"
+      width="100%"
+    />
+  </a>
+</p>
+
+The standalone **[one-page Warden architecture](docs/WARDEN_ARCHITECTURE.md)**
+labels the trust boundary, enforcement point, evidence path and recovery
+control. Design rationale and the extension seams used are in
+**[docs/WARDEN.md](docs/WARDEN.md)**.
+
+## Verification
 
 ```bash
 npm run check                                            # unit tests + build
@@ -61,46 +98,58 @@ npm run warden:smoke                                     # broker, no Docker nee
 WARDEN_DOCKER_TESTS=1 npm run test -w @launchpad/server   # real two-network topology
 ```
 
+The Docker suite boots the real broker, both networks and a fake upstream, then
+drives them from a container on the internal network. CI runs all three plus
+full-history secret scanning.
+
 To prove the credential boundary without displaying a secret, start a long
-Agent turn and run `npm run warden:secret-proof` in a second terminal. The proof
-checks the live broker, Runtime, public grants, traces, Runs and messages and
-prints only PASS/FAIL evidence. See the [live-demo guide](docs/DEMO.md).
+Agent turn and run `npm run warden:secret-proof` in a second terminal. It checks
+the live broker, Runtime, public grants, traces, Runs and messages, and prints
+only PASS/FAIL evidence.
 
-Warden's implementation, threat model and honest limitations are in
-**[docs/WARDEN.md](docs/WARDEN.md)**. Use the reproducible
-**[three-minute live demo](docs/DEMO.md)** to prepare and present the project.
-The standalone **[one-page Warden architecture](docs/WARDEN_ARCHITECTURE.md)**
-labels the trust boundary, enforcement point, evidence path and recovery
-control. The sections below describe the unmodified starter kit.
+## Limitations
 
-### Credentials and secret safety
+Warden is destination control, not data-loss prevention, and these are stated in
+full in [docs/WARDEN.md](docs/WARDEN.md):
+
+- TLS is not inspected on the network plane; enforcement is host and port.
+- The provider key is **moved into a trusted broker, not eliminated**.
+- Containers on the same internal network can still reach each other.
+- Grants are in-memory and do not survive a broker restart.
+- Identity is a mock principal; the point is server-side authorisation, not login.
+- Docker is the supported engine; Podman and Colima are untested for the broker.
+
+## Credentials and secret safety
 
 Reviewers supply their own ModelArk API key and Responses-compatible endpoint;
 the repository intentionally contains neither. A BytePlus key must be paired
 with the BytePlus `ARK_BASE_URL` shown above. A Volcengine key must use its
 matching regional Volcengine URL instead.
 
-Pass credentials only as environment variables or through an ignored local
-`.env` file. Never commit them, paste them into documentation, record the
-startup command on screen, or add a real value to `.gitleaks.toml`. The
-`secret-scan` CI job checks the complete Git history, while
-`npm run warden:secret-proof` verifies the live Runtime boundary without
-printing either credential.
+The provider key never enters an Agent Runtime, never appears in container
+arguments, and is redacted from traces, run errors and API responses. CI scans
+the full Git history with gitleaks. See [SECURITY.md](SECURITY.md) and
+`npm run warden:secret-proof`.
+
+## Documentation
+
+| Deliverable | Here | Detail |
+| --- | --- | --- |
+| Setup instructions | Quick start | [docs/LOCAL_POC.md](docs/LOCAL_POC.md) |
+| Middleware problem and rationale | Top of this file | [docs/WARDEN.md](docs/WARDEN.md) |
+| Design summary | What Warden changes | [docs/WARDEN_ARCHITECTURE.md](docs/WARDEN_ARCHITECTURE.md) |
+| One-page architecture | Architecture | [docs/WARDEN_ARCHITECTURE.md](docs/WARDEN_ARCHITECTURE.md) |
+| Demo steps | Reproduce the demonstration | [docs/DEMO.md](docs/DEMO.md) |
+| Automated tests | Verification | [docs/WARDEN.md](docs/WARDEN.md) |
+| Limitations | Limitations | [docs/WARDEN.md](docs/WARDEN.md), [SECURITY.md](SECURITY.md) |
+| No secrets | Credentials and secret safety | [SECURITY.md](SECURITY.md) |
 
 
-A minimal Agent platform for three-day middleware hackathons. It provides Agent
-CRUD, a browser Playground, persistent workspaces, and Codex CLI backed by the
-Volcengine Ark Responses API.
+---
 
-The starter baseline can run locally with Docker, Colima or rootless Podman, or
-deploy to Volcengine ECS. **Docker is the supported and verified Warden judging
-path.** Colima and Podman remain best-effort for the broker topology.
+# Starter platform reference
 
-> [!WARNING]
-> This remains a single-user proof of concept. Warden adds run-scoped delegation,
-> brokered egress, revocation and redacted traces on the official `npm run poc`
-> path; it does not add production identity, tenant isolation or a hardened
-> multi-tenant sandbox. See [SECURITY.md](SECURITY.md).
+Everything below documents the unmodified CodeJam starter kit.
 
 ## Screenshots
 
@@ -333,7 +382,7 @@ terraform fmt -check -recursive deploy/volcengine
 docker compose config
 ```
 
-## Documentation
+## All documentation files
 
 - [Warden technical documentation and threat model](docs/WARDEN.md)
 - [Three-minute Warden live demo](docs/DEMO.md)
