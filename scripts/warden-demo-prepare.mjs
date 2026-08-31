@@ -107,7 +107,7 @@ try {
       [
         "Prepared Agent: " + agent.name + " (" + agent.id + ")",
         "Copied exfil-demo.js into its persistent workspace.",
-        "Next: select the Node development profile and use the demo prompt in docs/WARDEN.md.",
+        "Next: select the Node development profile and use the demo prompt in docs/DEMO.md.",
         "",
       ].join("\n"),
     );

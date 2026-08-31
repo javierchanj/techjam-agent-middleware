@@ -42,13 +42,14 @@ WARDEN_DOCKER_TESTS=1 npm run test -w @launchpad/server   # real two-network top
 To prove the credential boundary without displaying a secret, start a long
 Agent turn and run `npm run warden:secret-proof` in a second terminal. The proof
 checks the live broker, Runtime, public grants, traces, Runs and messages and
-prints only PASS/FAIL evidence. See [Secret-handling demo](docs/WARDEN.md#secret-handling-demo).
+prints only PASS/FAIL evidence. See the [live-demo guide](docs/DEMO.md).
 
-Architecture, threat model, honest limitations and the three-minute demo script
-are in **[docs/WARDEN.md](docs/WARDEN.md)**. The standalone
-**[one-page Warden architecture](docs/WARDEN_ARCHITECTURE.md)** labels the trust
-boundary, enforcement point, evidence path and recovery control. The sections
-below describe the unmodified starter kit.
+Warden's implementation, threat model and honest limitations are in
+**[docs/WARDEN.md](docs/WARDEN.md)**. Use the reproducible
+**[three-minute live demo](docs/DEMO.md)** to prepare and present the project.
+The standalone **[one-page Warden architecture](docs/WARDEN_ARCHITECTURE.md)**
+labels the trust boundary, enforcement point, evidence path and recovery
+control. The sections below describe the unmodified starter kit.
 
 ### Credentials and secret safety
 
@@ -312,7 +313,8 @@ docker compose config
 
 ## Documentation
 
-- [Warden submission, threat model and demo](docs/WARDEN.md)
+- [Warden technical documentation and threat model](docs/WARDEN.md)
+- [Three-minute Warden live demo](docs/DEMO.md)
 - [One-page Warden architecture](docs/WARDEN_ARCHITECTURE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Local POC](docs/LOCAL_POC.md)

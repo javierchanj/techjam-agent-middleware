@@ -1,7 +1,9 @@
 # Warden — a capability-scoped egress broker for Agent Runtimes
 
 For the submission-ready trust-boundary view, see the
-[one-page Warden architecture](WARDEN_ARCHITECTURE.md).
+[one-page Warden architecture](WARDEN_ARCHITECTURE.md). For reproducible setup,
+exact Playground prompts and the presentation script, see the
+[three-minute live demo](DEMO.md).
 
 ## The problem
 
@@ -234,92 +236,19 @@ Known limitations:
 | Exfiltration continuing after revocation | Revocation tears down live tunnels and in-flight streams | `control.ts`, `gateway.ts` |
 | Runtime bypassing the network boundary | Real container on a real `--internal` network cannot reach 1.1.1.1:443 | `isolation.integration.test.ts` |
 
-## Three-minute demo
+## Live demonstration
 
-Uses `demo/exfil-demo.js` rather than depending on the model deciding to obey a
-malicious file, so the abuse case is deterministic. The Agent still invokes it
-through the real Playground, and Warden blocks the real network action.
+The complete preparation steps, exact Playground prompts, expected evidence,
+recovery procedure, troubleshooting guide and timed speaker script are in
+**[DEMO.md](DEMO.md)**.
 
-### Prepare once
+The scenario demonstrates:
 
-1. Start the POC and create an Agent in the frontend, preferably named
-   `Warden Demo Agent`.
-2. In a second terminal at the repository root, copy the controlled fixture
-   into that Agent's persistent workspace:
-
-   ```bash
-   npm run warden:demo:prepare -- --agent "Warden Demo Agent"
-   ```
-
-   If only one Agent exists, `npm run warden:demo:prepare` is sufficient. Set
-   `APP_AUTH_TOKEN` in that terminal when API authentication is enabled.
-3. Select the **Node development** delegation profile. This gives the run a
-   legitimate network capability, so the fixture's disallowed destination is
-   rejected precisely as `host_not_allowed` rather than by a blanket deny-all
-   profile.
-
-### Present one complete Run
-
-| Time | Action | What the judges see |
-| --- | --- | --- |
-| 0:00–0:25 | Select the prepared Agent and show `Ready`; state the invariant | Baseline Agent lifecycle is intact. The Runtime will receive a run grant, not the provider key. |
-| 0:25–0:40 | Submit the prompt below through the Playground | One real frontend-to-Agent Run starts. A grant and correlated trace appear. |
-| 0:40–1:25 | Show `npm start` succeeding | Real model, file and command execution work; the persisted `nanoid` dependency proves Warden is not a blanket blocker. |
-| 1:25–1:55 | Show `exfil-demo.js` output and the trace | Direct TCP is blocked by the internal network; brokered CONNECT receives `403 host_not_allowed`; the denial is recorded. |
-| 1:55–2:15 | In terminal two, run `npm run warden:secret-proof` while the wait command keeps the Runtime alive | PASS-only evidence shows the broker has the provider key, the Runtime has a `wgt_` grant, and neither raw value is exposed publicly. |
-| 2:15–2:35 | Click **Revoke access** | The exact grant is revoked and its Runtime is cancelled. The Agent returns to `Ready`; the trace remains understandable. |
-| 2:35–3:00 | Show the one-page architecture and green CI | Trust boundary, enforcement, instrumentation, recovery and limitations are explicit. |
-
-Playground prompt:
-
-```text
-Perform this security validation without modifying files or installing packages:
-
-1. Run npm start to prove the Node project and nanoid dependency persisted.
-2. Run node exfil-demo.js unchanged and report both containment results.
-3. Finally run:
-   node -e "setTimeout(() => console.log('demo-wait-complete'), 60000)"
-   and wait for it to finish.
-
-Report only what succeeded, what Warden denied, and why.
-```
-
-A red network child span is successful enforcement, not a broken platform. The
-overall Run becomes blocked/cancelled only when the operator intentionally
-revokes it in the final step. The Agent returning to `Ready` demonstrates
-recovery and continued control.
-
-Deliberately **not** in the demo: live budget editing, and token-exhaustion,
-which depends on the provider's streaming usage format. Token metering stays
-visible in the rail; it is not the thing being proven on stage.
-
-### Secret-handling demo
-
-Blocking a destination proves network policy; it does not by itself prove that
-the provider credential stayed out of the Agent Runtime. Warden includes a
-separate, deterministic host-side proof for that boundary.
-
-1. Start `npm run poc` and create or select an Agent.
-2. Start this Playground task so the disposable Runtime remains alive long
-   enough to inspect safely:
-
-   ```text
-   Run node -e "setTimeout(() => console.log('secret-proof-ready'), 60000)"
-   and wait for it to finish. Do not inspect or print environment variables.
-   ```
-
-3. While that Run is active, open a second terminal in the repository and run:
-
-   ```bash
-   npm run warden:secret-proof
-   ```
-
-The script reads container inspection data only in memory and never prints a
-credential. It proves that the broker holds the provider key, the Runtime holds
-only a `wgt_` grant, the public grant fingerprint matches that live grant, no
-credential is present in Runtime argv, and neither raw value appears in public
-grants, traces, Runs, messages or system data. Click **Revoke access** afterward
-to reuse the same active Run for the kill-switch demonstration.
+- a legitimate persisted Node task succeeding through the normal Agent path;
+- an undelegated egress attempt contained by the Runtime network and broker;
+- the provider credential remaining outside the Runtime;
+- a fresh run-scoped grant being revoked while active;
+- the Agent returning to `Ready` with correlated evidence preserved.
 
 ## Configuration
 

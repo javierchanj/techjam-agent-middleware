@@ -49,5 +49,6 @@ flowchart TB
 - Docker is the supported and verified judging topology. ECS runs the baseline
   with Warden disabled; Colima and Podman are unverified for Warden.
 
-See [WARDEN.md](WARDEN.md) for rationale, threat model, tests, exact demo steps
-and the complete limitations list.
+See [WARDEN.md](WARDEN.md) for rationale, threat model, tests and the complete
+limitations list. See [DEMO.md](DEMO.md) for preparation, exact prompts,
+expected evidence and the three-minute presentation script.
