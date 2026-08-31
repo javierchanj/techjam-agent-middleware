@@ -372,7 +372,7 @@ export default function WardenPanel({ agentId }: { agentId: string | null }) {
                   <span>{trace.spanCount} steps</span>
                   {trace.deniedCount > 0 && (
                     <span className="warden-badge">
-                      {trace.deniedCount} request{trace.deniedCount === 1 ? "" : "s"} denied
+                      {trace.deniedCount} denied step{trace.deniedCount === 1 ? "" : "s"}
                     </span>
                   )}
                 </button>

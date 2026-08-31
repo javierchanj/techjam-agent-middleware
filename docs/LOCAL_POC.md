@@ -2,7 +2,9 @@
 
 The local profile runs the React/Fastify control plane on macOS or Linux and
 starts every Codex turn in a disposable Docker, Colima, or Podman container.
-Only the Volcengine Ark model API is remote.
+Only the configured Ark/ModelArk model API is remote. Docker is the supported
+and verified Warden judging path; the Podman instructions below describe the
+starter baseline and remain outside the Warden support claim.
 
 ## Start
 
@@ -13,7 +15,10 @@ Requirements:
 - An Ark API key and Responses-capable endpoint
 
 ```bash
-ARK_API_KEY=your-ark-api-key ARK_MODEL=ep-your-endpoint-id npm run poc
+ARK_API_KEY=your-ark-api-key \
+ARK_MODEL=ep-your-endpoint-id \
+ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3 \
+npm run poc
 ```
 
 Open <http://localhost:3000>. Press `Ctrl+C` to stop the server and remove this
@@ -87,14 +92,17 @@ podman run --rm docker.io/library/alpine:3.20 echo PODMAN_OK
 
 ```bash
 CONTAINER_ENGINE=podman \
+WARDEN_ENABLED=false \
 ARK_API_KEY=your-ark-api-key \
 ARK_MODEL=ep-your-endpoint-id \
+ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3 \
 npm run poc
 ```
 
 This flow was verified on veLinux 2 with rootless Podman 4.3.1. A `vfs` storage
 driver works but needs more disk space; keep at least 5 GiB free for a cold
-build.
+build. It verifies the starter container Runtime, not Warden's dual-network
+broker topology.
 
 ## Common options
 
@@ -102,6 +110,7 @@ build.
 CONTAINER_RUNTIME_APT_PACKAGES='ca-certificates git ripgrep python3 build-essential' \
 ARK_API_KEY=your-ark-api-key \
 ARK_MODEL=ep-your-endpoint-id \
+ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3 \
 npm run poc
 ```
 

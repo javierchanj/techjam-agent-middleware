@@ -45,16 +45,33 @@ checks the live broker, Runtime, public grants, traces, Runs and messages and
 prints only PASS/FAIL evidence. See [Secret-handling demo](docs/WARDEN.md#secret-handling-demo).
 
 Architecture, threat model, honest limitations and the three-minute demo script
-are in **[docs/WARDEN.md](docs/WARDEN.md)**. The sections below describe the
-unmodified starter kit.
+are in **[docs/WARDEN.md](docs/WARDEN.md)**. The standalone
+**[one-page Warden architecture](docs/WARDEN_ARCHITECTURE.md)** labels the trust
+boundary, enforcement point, evidence path and recovery control. The sections
+below describe the unmodified starter kit.
+
+### Credentials and secret safety
+
+Reviewers supply their own ModelArk API key and Responses-compatible endpoint;
+the repository intentionally contains neither. A BytePlus key must be paired
+with the BytePlus `ARK_BASE_URL` shown above. A Volcengine key must use its
+matching regional Volcengine URL instead.
+
+Pass credentials only as environment variables or through an ignored local
+`.env` file. Never commit them, paste them into documentation, record the
+startup command on screen, or add a real value to `.gitleaks.toml`. The
+`secret-scan` CI job checks the complete Git history, while
+`npm run warden:secret-proof` verifies the live Runtime boundary without
+printing either credential.
 
 
 A minimal Agent platform for three-day middleware hackathons. It provides Agent
 CRUD, a browser Playground, persistent workspaces, and Codex CLI backed by the
 Volcengine Ark Responses API.
 
-Run it locally with Docker, Colima, or rootless Podman, or deploy it to
-Volcengine ECS.
+The starter baseline can run locally with Docker, Colima or rootless Podman, or
+deploy to Volcengine ECS. **Docker is the supported and verified Warden judging
+path.** Colima and Podman remain best-effort for the broker topology.
 
 > [!WARNING]
 > This remains a single-user proof of concept. Warden adds run-scoped delegation,
@@ -86,7 +103,7 @@ Volcengine ECS.
 
 - Node.js 22+
 - npm 10+
-- Docker, Colima, or Podman
+- Docker for the verified Warden path; Colima or Podman for the starter baseline
 - A BytePlus ModelArk API key and endpoint that supports the Responses API
 
 Codex CLI is included in the Runtime image and is not required on the host.
@@ -95,23 +112,22 @@ Codex CLI is included in the Runtime image and is not required on the host.
 
 ### 1. Check the local tools
 
-Install Node.js 22+ and one supported container engine, then verify them:
+Install Node.js 22+ and Docker for the supported Warden judging path, then
+verify them:
 
 ```bash
 node --version
 npm --version
-docker --version        # Docker Desktop, Docker Engine, or Colima
-podman --version        # Use this instead when running Podman
+docker --version        # Docker Desktop or Docker Engine
 ```
 
-Only one container engine is required. Codex CLI is already included in the
-Runtime image.
+Codex CLI is already included in the Runtime image.
 
 ### 2. Clone the repository
 
 ```bash
-git clone <repository-url> volc-agent-launchpad
-cd volc-agent-launchpad
+git clone https://github.com/javierchanj/techjam-agent-middleware.git
+cd techjam-agent-middleware
 ```
 
 Skip this step when already working from the repository root.
@@ -121,11 +137,13 @@ Skip this step when already working from the repository root.
 ```bash
 ARK_API_KEY=your-ark-api-key \
 ARK_MODEL=ep-your-endpoint-id \
+ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3 \
 npm run poc
 ```
 
 The first run installs Node.js dependencies and builds the Runtime image. The
-script automatically selects Docker, Colima, or Podman.
+script can select Docker, Colima, or Podman, but Docker is the verified Warden
+path. Use the endpoint URL that matches the account which issued the key.
 
 ### 4. Open the browser
 
@@ -169,6 +187,7 @@ Force Podman when multiple engines are installed:
 CONTAINER_ENGINE=podman \
 ARK_API_KEY=your-ark-api-key \
 ARK_MODEL=ep-your-endpoint-id \
+ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3 \
 npm run poc
 ```
 
@@ -190,6 +209,7 @@ Required values in `.env`:
 ```dotenv
 ARK_API_KEY=your-ark-api-key
 ARK_MODEL=ep-your-endpoint-id
+ARK_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3
 APP_AUTH_TOKEN=replace-with-at-least-24-random-characters
 ```
 
@@ -292,6 +312,8 @@ docker compose config
 
 ## Documentation
 
+- [Warden submission, threat model and demo](docs/WARDEN.md)
+- [One-page Warden architecture](docs/WARDEN_ARCHITECTURE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Local POC](docs/LOCAL_POC.md)
 - [Deployment](docs/DEPLOYMENT.md)

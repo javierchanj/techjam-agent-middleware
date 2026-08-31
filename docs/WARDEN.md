@@ -1,5 +1,8 @@
 # Warden — a capability-scoped egress broker for Agent Runtimes
 
+For the submission-ready trust-boundary view, see the
+[one-page Warden architecture](WARDEN_ARCHITECTURE.md).
+
 ## The problem
 
 Two lines in the Starter Kit's `container-codex-runner.ts` decide this:
@@ -141,7 +144,6 @@ impossible on the network plane: an HTTPS request inside a CONNECT tunnel is
 opaque to the broker, which can enforce *where* the Agent connects but not *what*
 it sends. A template named "read-only" would claim a control that does not exist,
 and there is a test asserting no template is ever named that.
-| Node development (`model-plus-dev-tools`) | Inference, GitHub and `registry.npmjs.org` for Node.js development |
 Templates are the only way to change delegation. Ad-hoc allow/deny and budget
 mutation endpoints were removed: they widened the API surface without adding a
 capability the demo or the threat model needs.
@@ -151,6 +153,20 @@ against the live policy without minting a grant, spending budget, or opening a
 socket. It runs the same pure decision function as the enforcement path, so the
 answer cannot drift from reality. Exposed in the rail as a single input box —
 a judge can name any host and get an immediate, honest verdict.
+
+## Operational finding: unexpected Codex telemetry
+
+During integration, Warden recorded an unexpected denied `CONNECT` to
+`ab.chatgpt.com:443`. It came from Codex's optional metrics exporter and was
+unrelated to the Agent's delegated task. Warden returned `host_not_allowed`.
+
+The destination was not added to a delegation profile. Instead, Codex is
+configured with `[otel] metrics_exporter = "none"`, eliminating the unnecessary
+traffic at its source. `config.test.ts` verifies that remediation, and
+`templates.test.ts` verifies that the host remains denied. This is an example
+of Warden turning previously invisible Runtime egress into an observable and
+actionable finding; the controlled fixture below remains the reproducible live
+demonstration.
 
 ## Fail-closed
 
@@ -224,20 +240,54 @@ Uses `demo/exfil-demo.js` rather than depending on the model deciding to obey a
 malicious file, so the abuse case is deterministic. The Agent still invokes it
 through the real Playground, and Warden blocks the real network action.
 
+### Prepare once
+
+1. Start the POC and create an Agent in the frontend, preferably named
+   `Warden Demo Agent`.
+2. In a second terminal at the repository root, copy the controlled fixture
+   into that Agent's persistent workspace:
+
+   ```bash
+   npm run warden:demo:prepare -- --agent "Warden Demo Agent"
+   ```
+
+   If only one Agent exists, `npm run warden:demo:prepare` is sufficient. Set
+   `APP_AUTH_TOKEN` in that terminal when API authentication is enabled.
+3. Select the **Node development** delegation profile. This gives the run a
+   legitimate network capability, so the fixture's disallowed destination is
+   rejected precisely as `host_not_allowed` rather than by a blanket deny-all
+   profile.
+
+### Present one complete Run
+
 | Time | Action | What the judges see |
 | --- | --- | --- |
-| 0:00–0:25 | Show the two starter-kit lines; state the invariant | The flaw is concrete and pre-existing, not invented for the demo. |
-| 0:25–1:10 | Normal coding task through the Playground | Real Codex run succeeds through a run grant. Trace fills in live. |
-| 1:10–1:25 | Open the grant card; ask a judge to name any host and type it into the check box | Credential type: run grant. Fingerprint `91f3…`. Provider key in Runtime: no. Their host comes back `host_not_allowed` without anything being run. |
-| 1:25–2:10 | Ask the Agent to run `exfil-demo.js` | It prints the credential *type* and fingerprint (never a value), probes both layers, and reports `blocked by the network` then `denied by Warden policy: host_not_allowed`. The rail shows a matching red span. |
+| 0:00–0:25 | Select the prepared Agent and show `Ready`; state the invariant | Baseline Agent lifecycle is intact. The Runtime will receive a run grant, not the provider key. |
+| 0:25–0:40 | Submit the prompt below through the Playground | One real frontend-to-Agent Run starts. A grant and correlated trace appear. |
+| 0:40–1:25 | Show `npm start` succeeding | Real model, file and command execution work; the persisted `nanoid` dependency proves Warden is not a blanket blocker. |
+| 1:25–1:55 | Show `exfil-demo.js` output and the trace | Direct TCP is blocked by the internal network; brokered CONNECT receives `403 host_not_allowed`; the denial is recorded. |
+| 1:55–2:15 | In terminal two, run `npm run warden:secret-proof` while the wait command keeps the Runtime alive | PASS-only evidence shows the broker has the provider key, the Runtime has a `wgt_` grant, and neither raw value is exposed publicly. |
+| 2:15–2:35 | Click **Revoke access** | The exact grant is revoked and its Runtime is cancelled. The Agent returns to `Ready`; the trace remains understandable. |
+| 2:35–3:00 | Show the one-page architecture and green CI | Trust boundary, enforcement, instrumentation, recovery and limitations are explicit. |
 
-> Start the demo with one benign destination allowlisted, e.g.
-> `WARDEN_ALLOWED_NETWORK_HOSTS=api.github.com:443`. This shows the allowlist is
-> a real allowlist rather than a blanket block, and makes the denial read
-> `host_not_allowed` instead of the coarser `plane_not_allowed` you get when a
-> grant holds no network capability at all.
-| 2:10–2:40 | Start a longer run, click **Revoke access** | Grant revoked *and* container cancelled. Agent returns to idle. Trace shows exactly where it stopped. |
-| 2:40–3:00 | `npm run check`, architecture diagram, limitations slide | All green; limitations stated openly. |
+Playground prompt:
+
+```text
+Perform this security validation without modifying files or installing packages:
+
+1. Run npm start to prove the Node project and nanoid dependency persisted.
+2. Run node exfil-demo.js unchanged and report both containment results.
+3. Finally run:
+   node -e "setTimeout(() => console.log('demo-wait-complete'), 60000)"
+   and wait for it to finish.
+
+Report only what succeeded, what Warden denied, and why.
+```
+
+A red network child span is successful enforcement, not a broken platform. The
+overall Run becomes blocked/cancelled only when the operator intentionally
+revokes it in the final step. The Agent returning to `Ready` demonstrates
+recovery and continued control.
 
 Deliberately **not** in the demo: live budget editing, and token-exhaustion,
 which depends on the provider's streaming usage format. Token metering stays

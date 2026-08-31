@@ -3,6 +3,7 @@ import { AgentService } from "./agent-service.js";
 import { createApp } from "./app.js";
 import { loadConfig, modelPlaneBaseUrl, writeCodexConfig } from "./config.js";
 import { createRunner } from "./runner-factory.js";
+import { listenWithCleanup } from "./startup.js";
 import { JsonStore } from "./store.js";
 import { startWarden, type Warden } from "./warden/index.js";
 import { WorkspaceManager } from "./workspace.js";
@@ -66,4 +67,4 @@ const shutdown = async (signal: string) => {
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
 
-await app.listen({ host: config.host, port: config.port });
+await listenWithCleanup(app, warden, { host: config.host, port: config.port });

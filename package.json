@@ -18,6 +18,7 @@
     "check": "npm run typecheck && npm run test && npm run build",
     "poc": "./scripts/start-local-poc.sh",
     "warden:smoke": "npm run build -w @launchpad/server && node scripts/warden-smoke.mjs",
+    "warden:demo:prepare": "node scripts/warden-demo-prepare.mjs",
     "warden:secret-proof": "node scripts/warden-secret-proof.mjs",
     "start": "npm run start -w @launchpad/server"
   },
