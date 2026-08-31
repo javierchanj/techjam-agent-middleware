@@ -6,6 +6,16 @@
 > direct route to the Internet. External access must cross Warden under a live,
 > scoped, metered and revocable run grant.
 
+## Complete system architecture
+
+![Warden architecture showing the preserved starter platform, Warden middleware, untrusted Runtime, broker enforcement and evidence flow](assets/warden-architecture.svg)
+
+The blue components are the preserved starter platform. Purple components are
+Warden middleware and enforcement. Orange identifies the untrusted Runtime;
+green identifies approved external destinations; red identifies denied egress.
+
+## Compact source-controlled view
+
 ```mermaid
 flowchart TB
     UI["Browser / Playground"] -->|"create Agent · send task · revoke"| CP

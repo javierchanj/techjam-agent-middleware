@@ -6,6 +6,28 @@ This fork adds **Warden**, middleware that replaces the Runtime's ambient
 provider credential and open internet access with a run-scoped, brokered,
 metered and revocable capability.
 
+## Warden at a glance
+
+Warden preserves the starter Agent platform while moving credential and network
+authority out of the untrusted Runtime.
+
+<p align="center">
+  <a href="docs/WARDEN_ARCHITECTURE.md">
+    <img
+      src="docs/assets/warden-demo-flow.svg"
+      alt="Warden run flow showing scoped delegation, broker enforcement, denial, evidence and revocation"
+      width="100%"
+    />
+  </a>
+</p>
+
+The Runtime receives only a temporary `wgt_` grant. The trusted Warden broker
+holds the provider credential, enforces destination and budget policy, records
+correlated evidence, and can revoke the exact active Run.
+
+See the [complete Warden architecture](docs/WARDEN_ARCHITECTURE.md) and
+[three-minute demonstration guide](docs/DEMO.md).
+
 **Judging path — this is the one that runs Warden:**
 
 ```bash
