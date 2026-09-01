@@ -16,7 +16,7 @@ run-scoped capability: the Runtime holds only a short-lived `wgt_` grant, has no
 direct Internet route, and every request it makes is authorised at a trusted
 broker that a human controls and the Agent cannot reach.
 
-# How Warden works
+## How Warden works
 Warden is a trusted middleware layer between the Agent Runtime and external
 services. It treats model-authored code inside the Runtime as untrusted.
 
