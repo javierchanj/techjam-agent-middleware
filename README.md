@@ -16,6 +16,21 @@ run-scoped capability: the Runtime holds only a short-lived `wgt_` grant, has no
 direct Internet route, and every request it makes is authorised at a trusted
 broker that a human controls and the Agent cannot reach.
 
+# How Warden works
+Warden is a trusted middleware layer between the Agent Runtime and external
+services. It treats model-authored code inside the Runtime as untrusted.
+
+When an Agent Run starts, Warden issues that Run a short-lived wgt_ grant
+instead of exposing the real ModelArk credential. The Runtime also loses direct
+Internet access. Requests must therefore pass through Warden's broker, where
+their grant, destination and execution budget are checked before anything is
+forwarded.
+
+Warden records the resulting decisions as redacted, Run-correlated evidence.
+Because authority belongs to the individual Run rather than the underlying
+provider credential, that authority can also be revoked while the Agent is
+executing.
+
 ## Quick start — the verified Warden path
 
 Requires Node.js 22+, npm 10+, Docker, and your own ModelArk key and endpoint.
